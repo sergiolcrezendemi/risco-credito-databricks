@@ -1,0 +1,21 @@
+resources:
+  jobs:
+    credito_pipeline:
+      name: "credito - pipeline diario"
+      tasks:
+        - task_key: ingestao_bronze
+          notebook_task:
+            notebook_path: ../notebooks/01_ingestao_bronze.py
+        - task_key: inferencia_batch
+          depends_on:
+            - task_key: ingestao_bronze
+          notebook_task:
+            notebook_path: ../notebooks/03_inferencia_batch.py
+        - task_key: monitoramento_drift
+          depends_on:
+            - task_key: inferencia_batch
+          notebook_task:
+            notebook_path: ../notebooks/04_monitoramento_drift.py
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "America/Sao_Paulo"

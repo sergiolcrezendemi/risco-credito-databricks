@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+data/raw/*
+!data/raw/.gitkeep
+data/processed/
+.databrickscfg
+.env
+*.pem
+.databricks/
