@@ -1,4 +1,4 @@
-# Risco de Crédito — Score de Probabilidade de Inadimplência
+# Risco de Crédito — Score de Probabilidade de Inadimplência  ok
 
 *Parte da série **Databricks de Ponta a Ponta***
 

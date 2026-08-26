@@ -19,3 +19,9 @@ resources:
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"
         timezone_id: "America/Sao_Paulo"
+    credito_retreino:
+      name: "credito - retreino do modelo"
+      tasks:
+        - task_key: treino_modelo
+          notebook_task:
+            notebook_path: ../notebooks/02_treino_modelo.py

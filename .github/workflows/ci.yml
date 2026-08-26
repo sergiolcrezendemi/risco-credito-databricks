@@ -1,4 +1,4 @@
-name: CI
+name: CI e Deploy
 
 on:
   pull_request:
@@ -14,6 +14,79 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt ruff pytest
+      - run: pip install -e ".[dev]"
       - run: ruff check src/
       - run: pytest tests/ -v
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    outputs:
+      relevante: ${{ steps.filter.outputs.relevante }}
+      pipeline: ${{ steps.filter.outputs.pipeline }}
+      retreino: ${{ steps.filter.outputs.retreino }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevante:
+              - 'notebooks/**'
+              - 'src/**'
+              - 'resources/**'
+              - 'databricks.yml'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            pipeline:
+              - 'notebooks/01_ingestao_bronze.py'
+              - 'notebooks/03_inferencia_batch.py'
+              - 'notebooks/04_monitoramento_drift.py'
+            retreino:
+              - 'notebooks/02_treino_modelo.py'
+
+  deploy-hml:
+    # So roda deploy se algo relevante mudou -- README, CHANGELOG, docs/*,
+    # .env.example etc. nao disparam nada aqui
+    if: >
+      github.ref == 'refs/heads/develop' && github.event_name == 'push' &&
+      needs.detect-changes.outputs.relevante == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: hml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Deploy Asset Bundle em HML
+        run: databricks bundle deploy -t hml
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      - name: Rodar pipeline diario (se mudou)
+        if: needs.detect-changes.outputs.pipeline == 'true'
+        run: databricks bundle run -t hml credito_pipeline
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      - name: Rodar retreino (se mudou)
+        if: needs.detect-changes.outputs.retreino == 'true'
+        run: databricks bundle run -t hml credito_retreino
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  deploy-prd:
+    if: >
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.detect-changes.outputs.relevante == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Deploy Asset Bundle em PRD
+        run: databricks bundle deploy -t prd
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
