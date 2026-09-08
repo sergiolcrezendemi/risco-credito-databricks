@@ -1,1 +1,6 @@
-testar dentro do databricks para validar a homologação e produção
+o grafico de silver foi feito no jobs & pipelines
+  prompt apoio:  https://gemini.google.com/app/8de1d5cbedc2a438
+
+
+
+  
