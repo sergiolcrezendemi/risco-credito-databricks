@@ -1,0 +1,27 @@
+Validar o bundle localmente
+Antes de qualquer deploy, rode `databricks bundle validate -t hml` na raiz do projeto. Isso garante que o `job.yml` está sintaticamente correto e que todos os `notebook_path` apontam para arquivos que realmente existem no repositório — evita repetir o erro 'notebook not found' que você teve antes.
+2
+Deploy em HML e checar o Actions
+Faça push da branch e acompanhe o workflow 'CI e Deploy' no GitHub Actions. Confirme que os jobs `lint-and-test`, `detect-changes` e `deploy-hml` terminam verdes. Depois, no workspace Databricks (ambiente `hml`), abra Jobs & Pipelines e confira se `credito_pipeline` e `credito_retreino` aparecem criados/atualizados.
+3
+Testar a ingestão Bronze isoladamente
+Rode manualmente só a task `ingestao_bronze` (ou o notebook direto) e confira: (1) a tabela `credito_prd.bronze.give_me_some_credit_raw` foi criada/atualizada, (2) `SELECT count(*) FROM credito_prd.bronze.give_me_some_credit_raw` retorna volume esperado, (3) não houve erro de schema. Rodar `EAD_bronze.py` neste ponto ajuda a auditar nulos/duplicidade antes de seguir.
+4
+Validar a transformação para Silver
+Se a Silver é alimentada via pipeline DLT separado, confira no menu 'Jobs & Pipelines' se o pipeline DLT rodou com sucesso após a carga da Bronze. Em seguida rode `EAD_silver.py` para conferir a tabela `credito_prd.silver.give_me_some_credit`: contagem de linhas, % de nulos por coluna e distribuição do target (`target_default_2yrs`).
+5
+Rodar o treino do modelo
+Execute a task `treino_modelo` isoladamente. Confira no MLflow Experiments (`/Shared/credito-risco/treino_modelo`) se o run foi registrado com métricas (`test_auc`, `test_avg_precision`). No Unity Catalog, em Models, confirme que `credito_prd.ml.credito_default_model` tem uma nova versão com o alias `challenger` apontando para ela.
+6
+Rodar a inferência em lote
+Execute a task `inferencia_batch`. Verifique se `credito_prd.gold.give_me_some_credit_scores` foi populada: `SELECT count(*), min(score_probabilidade_default), max(score_probabilidade_default) FROM credito_prd.gold.give_me_some_credit_scores`. Os escores devem estar entre 0 e 1 e o volume deve bater com a Silver.
+7
+Rodar o monitoramento de drift
+Execute a task `monitoramento_drift`. Confirme que `credito_prd.ml.drift_monitoring_report` recebeu uma nova linha por feature monitorada, com `ks_statistic` e `p_value` preenchidos. Como é a primeira execução, o esperado é 'estável' (baseline vs. os mesmos dados de origem) — drift real só aparece com dados futuros diferentes do treino.
+8
+Rodar o job completo e promover para PRD
+Dispare `credito_pipeline` inteiro (Run now, sem esperar o cron) e confirme que as 3 tasks encadeadas (`ingestao_bronze` → `inferencia_batch` → `monitoramento_drift`) rodam em sequência sem falha. Se tudo estiver verde em HML, faça o merge/push para a branch de produção e confira o job `deploy-prd` no Actions.
+Um ponto de atenção que vale destacar antes de rodar: o notebook 04_monitoramento_drift.py que criei espera uma tabela credito_prd.ml.training_sample (amostra bruta do treino) — se 02_treino_modelo.py ainda não foi ajustado para persistir essa amostra, o passo 7 vai avisar e pular em vez de comparar de fato. Vale conferir isso antes de chegar lá.
+
+Se qualquer task falhar em algum desses passos, me manda o print/log de erro que eu ajudo a diagnosticar — como fizemos com o 03_inferencia_batch.py no início.
+
