@@ -172,4 +172,19 @@ def run_silver_ingestion(
     )
     query_silver.awaitTermination()
 
-    print(f"[OK] Carga Silver concluída em {silver_table}")
+    if not spark.catalog.tableExists(silver_table):
+        raise RuntimeError(
+            f"[FALHA] {silver_table} não foi criada. O stream rodou (awaitTermination "
+            f"concluiu) mas nenhum micro-batch chegou a gravar dados — sinal de que o "
+            f"checkpoint em {checkpoint_path} já considerava tudo processado de uma "
+            f"execução anterior. Apague esse checkpoint e rode de novo."
+        )
+
+    row_count = spark.table(silver_table).count()
+    if row_count == 0:
+        raise RuntimeError(
+            f"[FALHA] {silver_table} existe mas está vazia. Verifique se "
+            f"{bronze_table} tem dados."
+        )
+
+    print(f"[OK] Carga Silver concluída em {silver_table} — {row_count:,} linhas")

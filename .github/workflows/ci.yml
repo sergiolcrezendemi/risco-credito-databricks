@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
-      - run: ruff check src/
+      - run: pre-commit run --all-files --show-diff-on-failure
       - run: pytest tests/ -v
 
   detect-changes:
@@ -24,7 +24,6 @@ jobs:
     outputs:
       relevante: ${{ steps.filter.outputs.relevante }}
       pipeline: ${{ steps.filter.outputs.pipeline }}
-      retreino: ${{ steps.filter.outputs.retreino }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -37,13 +36,19 @@ jobs:
               - 'resources/**'
               - 'databricks.yml'
               - 'pyproject.toml'
-              - 'requirements.txt'
             pipeline:
-              - 'notebooks/01_ingestao_bronze.py'
-              - 'notebooks/03_inferencia_batch.py'
-              - 'notebooks/04_monitoramento_drift.py'
-            retreino:
-              - 'notebooks/02_treino_modelo.py'
+              - 'notebooks/ingestao/**'
+              - 'notebooks/ml/**'
+              - 'src/ingestion/**'
+              - 'src/features/**'
+              - 'src/models/**'
+            # 'retreino' removido por enquanto -- não existe mais um notebook
+            # de treino separado (02_treino_modelo.py); o treino acontece
+            # dentro de notebooks/ml/01_hipoteses_h1_h4.py e
+            # 02_vies_threshold_roi.py, cobertos pelo filtro 'pipeline'
+            # acima. Se um job de retreino dedicado for criado no futuro
+            # (ver docs/roteiro-execucao.md, seção "Em construção"),
+            # reintroduzir o filtro aqui apontando para o notebook real.
 
   deploy-hml:
     # So roda deploy se algo relevante mudou -- README, CHANGELOG, docs/*,
@@ -62,15 +67,9 @@ jobs:
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      - name: Rodar pipeline diario (se mudou)
+      - name: Rodar pipeline (se algo em ingestão/ml mudou)
         if: needs.detect-changes.outputs.pipeline == 'true'
-        run: databricks bundle run -t hml credito_pipeline
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      - name: Rodar retreino (se mudou)
-        if: needs.detect-changes.outputs.retreino == 'true'
-        run: databricks bundle run -t hml credito_retreino
+        run: databricks bundle run -t hml risco_credito_pipeline
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}

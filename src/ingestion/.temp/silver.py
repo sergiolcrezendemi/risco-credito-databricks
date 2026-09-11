@@ -122,7 +122,6 @@ def upsert_to_silver(batch_df: DataFrame, batch_id: int, silver_table: str) -> N
 def run_silver_ingestion(
     spark: SparkSession,
     catalog: str,
-    dataset: str = "training",
     schema: str = "silver",
     bronze_schema: str = "bronze",
     table_name: str = "give_me_some_credit",
@@ -132,21 +131,10 @@ def run_silver_ingestion(
 
     Corrige o bug observado no notebook original: o volume de checkpoint
     agora é garantido ANTES do início do writeStream.
-
-    Parameters
-    ----------
-    dataset: qual Bronze usar como origem — "training" (default, alimenta o
-             modelo) ou "scoring" (holdout sem label, para inferência). Só
-             o "training" gera a tabela `{table_name}` padrão; qualquer
-             outro dataset gera `{table_name}_{dataset}` para não colidir.
     """
-    bronze_table = f"{catalog}.{bronze_schema}.{table_name}_{dataset}_raw"
-    silver_table = (
-        f"{catalog}.{schema}.{table_name}"
-        if dataset == "training"
-        else f"{catalog}.{schema}.{table_name}_{dataset}"
-    )
-    checkpoint_path = f"/Volumes/{catalog}/{schema}/checkpoints/{table_name}_{dataset}/"
+    bronze_table = f"{catalog}.{bronze_schema}.{table_name}_raw"
+    silver_table = f"{catalog}.{schema}.{table_name}"
+    checkpoint_path = f"/Volumes/{catalog}/{schema}/checkpoints/{table_name}/"
 
     # 1. Garante schema e volume ANTES de qualquer referência no writeStream
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")

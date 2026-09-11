@@ -6,15 +6,6 @@
 # Este módulo concentra a lógica de ingestão Bronze para ser importada pelos
 # notebooks de orquestração (notebooks/ingestao/01_bronze.py). Os notebooks
 # não devem reimplementar este código — apenas chamar `run_bronze_ingestion`.
-#
-# ESTRUTURA DE PASTAS (raw_landing separado por dataset lógico):
-#   /Volumes/{catalog}/bronze/raw_landing/training/  → cs-training.csv (com target)
-#   /Volumes/{catalog}/bronze/raw_landing/scoring/   → cs-test.csv (sem target)
-#
-# `training` e `scoring` são semanticamente diferentes (um tem
-# SeriousDlqin2yrs preenchido, usado para treinar o modelo; o outro é para
-# inferência/submissão, sem label) e por isso viram tabelas Bronze
-# separadas — nunca são lidos com o mesmo glob dentro do mesmo stream.
 # ==============================================================================
 
 from pyspark.sql import DataFrame, SparkSession
@@ -98,7 +89,6 @@ def write_bronze_incremental(
 def run_bronze_ingestion(
     spark: SparkSession,
     catalog: str,
-    dataset: str,
     schema: str = "bronze",
     table_name: str = "give_me_some_credit",
 ) -> None:
@@ -109,16 +99,11 @@ def run_bronze_ingestion(
     ----------
     catalog: nome do catálogo Unity Catalog (ex.: "credito_dev", "credito_prd")
              — deve vir de um widget no notebook, nunca hardcoded.
-    dataset: subpasta lógica dentro de raw_landing/ — "training" ou "scoring".
-             Sem valor default de propósito: força o notebook a declarar
-             explicitamente qual dataset está processando, em vez de ler
-             tudo com um glob genérico (foi o que misturou cs-training.csv
-             e cs-test.csv na mesma tabela antes).
     """
-    target_table = f"{catalog}.{schema}.{table_name}_{dataset}_raw"
-    raw_data_path = f"/Volumes/{catalog}/{schema}/raw_landing/{dataset}/"
-    checkpoint_path = f"/Volumes/{catalog}/{schema}/checkpoints/{table_name}_{dataset}_bronze/"
-    schema_location = f"/Volumes/{catalog}/{schema}/schemas/{table_name}_{dataset}_bronze/"
+    target_table = f"{catalog}.{schema}.{table_name}_raw"
+    raw_data_path = f"/Volumes/{catalog}/{schema}/raw_landing/"
+    checkpoint_path = f"/Volumes/{catalog}/{schema}/checkpoints/{table_name}_bronze/"
+    schema_location = f"/Volumes/{catalog}/{schema}/schemas/{table_name}_bronze/"
 
     ensure_bronze_infra(spark, catalog, schema)
 
@@ -136,3 +121,6 @@ def run_bronze_ingestion(
             f"apague o checkpoint e o schemaLocation e rode novamente."
         )
     print(f"[OK] Ingestão Bronze concluída em {target_table} — {row_count:,} linhas")
+
+
+    
