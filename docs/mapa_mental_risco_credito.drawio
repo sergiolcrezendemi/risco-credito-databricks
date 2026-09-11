@@ -1,0 +1,366 @@
+<mxfile host="app.diagrams.net" agent="Claude">
+  <diagram name="Mapa Mental - Risco de Credito" id="mapa-risco-credito">
+    <mxGraphModel dx="1501" dy="913" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="exec1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;1. Deploy do bundle&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;databricks bundle deploy -t dev&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="exec3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;3. CI/CD automático&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;GitHub Actions: lint-test -&gt; deploy-hml -&gt; deploy-prd&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="208" as="geometry" />
+        </mxCell>
+        <mxCell id="exec4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Ambientes&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;dev / hml / prd (targets no databricks.yml)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="292" as="geometry" />
+        </mxCell>
+        <mxCell id="exec" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Como executar&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="220" x="340" y="171" as="geometry" />
+        </mxCell>
+        <mxCell id="dir1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;databricks.yml&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Manifesto do bundle (targets, includes)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="376" as="geometry" />
+        </mxCell>
+        <mxCell id="dir2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;resources/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Jobs e pipelines declarativos (YAML)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;ingestao/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Autoloader -&gt; Bronze&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="544" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;ml/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Treino, avaliação, inferência batch&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="628" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3c" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;monitoracao/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Drift, alertas&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="712" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3d" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;ead/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Exploração manual (fora do job.yml)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="796" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3e" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;sql/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;DDL de schemas/tabelas&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="dir3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;notebooks/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Orquestração fina (sem lógica de negócio)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="712" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;ingestion/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Leitura/parsing da fonte&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="964" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4c" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;features/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Feature engineering compartilhada&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="1132" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4d" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;ml/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Treino, métricas, registro MLflow&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="1216" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4e" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;monitoring/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Cálculo de drift (KS/PSI)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="1300" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4f" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;utils/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Config, logging, validação&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="1384" as="geometry" />
+        </mxCell>
+        <mxCell id="dir4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;src/risco_credito/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Lógica de negócio testável (pytest)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="230" x="640" y="1174" as="geometry" />
+        </mxCell>
+        <mxCell id="dir5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;tests/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Espelha src/, roda no CI a cada PR&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1468" as="geometry" />
+        </mxCell>
+        <mxCell id="dir6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;conf/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Parâmetros por ambiente (catálogo, thresholds)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1552" as="geometry" />
+        </mxCell>
+        <mxCell id="dir7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;.github/workflows/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Pipelines de CI/CD&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1636" as="geometry" />
+        </mxCell>
+        <mxCell id="dir8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Raiz do repo&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;README, pyproject.toml, CHANGELOG&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1720" as="geometry" />
+        </mxCell>
+        <mxCell id="estrutura" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Estrutura de diretórios&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="220" x="340" y="1053" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Bronze&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Ingestão via Autoloader&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1804" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Silver -&gt; Gold&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Limpeza, outliers, feature store&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="1888" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Treino &amp; validação&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;LogReg vs XGBoost, SHAP obrigatório&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="650" y="1972" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Registro&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Unity Catalog Model Registry (@champion/@challenger)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2056" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Produção&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Serving, monitoramento, RBAC (pendente)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2140" as="geometry" />
+        </mxCell>
+        <mxCell id="pipeline" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAECE7;strokeColor=#993C1D;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Pipeline do modelo&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="220" x="340" y="1977" as="geometry" />
+        </mxCell>
+        <mxCell id="hip1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;H1&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Atrasos específicos — contrariada&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2224" as="geometry" />
+        </mxCell>
+        <mxCell id="hip2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;H2&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Utilização rotativa &gt; renda — confirmada&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2308" as="geometry" />
+        </mxCell>
+        <mxCell id="hip3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Threshold ótimo&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;0,56 (economia de R$ 204 mil)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2392" as="geometry" />
+        </mxCell>
+        <mxCell id="hip4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Impacto financeiro&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;R$ 13,45 milhões líquidos&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2476" as="geometry" />
+        </mxCell>
+        <mxCell id="hip5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Viés detectado&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Jovens 18-30, 60+, renda alta&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="2560" as="geometry" />
+        </mxCell>
+        <mxCell id="hipoteses" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEEDFE;strokeColor=#534AB7;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Hipóteses &amp; resultados&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="220" x="270" y="2400" as="geometry" />
+        </mxCell>
+        <mxCell id="root" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;Risco de Crédito — Databricks&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;github.com/sergiolcrezendemi/risco-credito-databricks&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="260" x="40" y="1274" as="geometry" />
+        </mxCell>
+        <mxCell id="e_root_exec" edge="1" parent="1" source="root" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="196" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_exec_exec1" edge="1" parent="1" source="exec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_exec_exec2" edge="1" parent="1" source="exec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_exec_exec3" edge="1" parent="1" source="exec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_exec_exec4" edge="1" parent="1" source="exec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="196" />
+              <mxPoint x="590" y="322" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_root_estrutura" edge="1" parent="1" source="root" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="estrutura">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="1078" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir1" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="1078" />
+              <mxPoint x="610" y="406" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir2" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="1078" />
+              <mxPoint x="630" y="490" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir3" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir3_dir3a" edge="1" parent="1" source="dir3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3a">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="742" />
+              <mxPoint x="910" y="574" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dir3_dir3b" edge="1" parent="1" source="dir3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3b">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="742" />
+              <mxPoint x="920" y="658" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dir3_dir3c" edge="1" parent="1" source="dir3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3c">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir3_dir3d" edge="1" parent="1" source="dir3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3d">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="742" />
+              <mxPoint x="920" y="826" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dir3_dir3e" edge="1" parent="1" source="dir3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir3e">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="742" />
+              <mxPoint x="910" y="910" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir4" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir4_dir4a" edge="1" parent="1" source="dir4b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4a">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir4_dir4b" edge="1" parent="1" source="dir4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4b">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="1204" />
+              <mxPoint x="910" y="1078" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dir4_dir4c" edge="1" parent="1" source="dir4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4c">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir4_dir4d" edge="1" parent="1" source="dir4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4d">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dir4_dir4e" edge="1" parent="1" source="dir4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4e">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="1204" />
+              <mxPoint x="910" y="1330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dir4_dir4f" edge="1" parent="1" source="dir4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir4f">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="1414" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir5" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620" y="1078" />
+              <mxPoint x="620" y="1498" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir6" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="1078" />
+              <mxPoint x="610" y="1582" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir7" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1078" />
+              <mxPoint x="600" y="1666" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_estrutura_dir8" edge="1" parent="1" source="estrutura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B6D11;jettySize=auto;orthogonalLoop=1;" target="dir8">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="1078" />
+              <mxPoint x="590" y="1750" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_root_pipeline" edge="1" parent="1" source="root" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipeline">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pipeline_pipe1" edge="1" parent="1" source="pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipe1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="2002" />
+              <mxPoint x="610" y="1834" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pipeline_pipe2" edge="1" parent="1" source="pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipe2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="2002" />
+              <mxPoint x="630" y="1918" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pipeline_pipe3" edge="1" parent="1" source="pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipe3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pipeline_pipe4" edge="1" parent="1" source="pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipe4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="2002" />
+              <mxPoint x="630" y="2086" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pipeline_pipe5" edge="1" parent="1" source="pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#993C1D;jettySize=auto;orthogonalLoop=1;" target="pipe5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="2002" />
+              <mxPoint x="610" y="2170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_root_hipoteses" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="hipoteses">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="10" y="1309" />
+              <mxPoint x="10" y="2422" />
+              <mxPoint x="340" y="2422" />
+            </Array>
+            <mxPoint x="40" y="1309.0000000000002" as="sourcePoint" />
+            <mxPoint x="80" y="2422" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hipoteses_hip1" edge="1" parent="1" source="hipoteses" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;" target="hip1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="2422" />
+              <mxPoint x="520" y="2254" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hipoteses_hip2" edge="1" parent="1" source="hipoteses" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;" target="hip2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="2422" />
+              <mxPoint x="560" y="2338" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hipoteses_hip3" edge="1" parent="1" source="hipoteses" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;" target="hip3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hipoteses_hip4" edge="1" parent="1" source="hipoteses" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;" target="hip4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="2430" />
+              <mxPoint x="600" y="2506" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hipoteses_hip5" edge="1" parent="1" source="hipoteses" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#534AB7;jettySize=auto;orthogonalLoop=1;" target="hip5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="2422" />
+              <mxPoint x="530" y="2590" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dir4b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF3DE;strokeColor=#3B6D11;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;transform/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Limpeza Bronze -&gt; Silver&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="940" y="1053" as="geometry" />
+        </mxCell>
+        <mxCell id="m-QEiRfisyFob7QaulTM-2" edge="1" parent="1" source="exec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#185FA5;jettySize=auto;orthogonalLoop=1;" target="exec2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="196" as="sourcePoint" />
+            <mxPoint x="770" y="100" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="exec2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F1FB;strokeColor=#185FA5;fontColor=#1A1A1A;fontSize=12;align=center;verticalAlign=middle;arcSize=12;" value="&lt;b&gt;2. Rodar job manual&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;databricks bundle run -t dev credito_pipeline&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="260" x="640" y="124" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
