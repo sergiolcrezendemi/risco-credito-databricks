@@ -1,0 +1,32 @@
+
+
+
+https://claude.ai/chat/9792a713-8710-451b-afc5-7e159d97a567
+
+
+Aqui está a lista completa, separada em duas partes:
+
+## 📁 Diretório / estrutura do repositório
+
+- [x ] Remover (ou mover para uma pasta local `.archive/` fora do git) os arquivos de rascunho: `(Clone) requirements.txt`, `fazer.txt.ipynb`, `leiame-databricks-v1.txt`
+- [x ] Renomear `JUSTIFICATIVA.md.ipynb` → `JUSTIFICATIVA.md` (conteúdo é texto, não notebook)
+- [x ] Verificar se `requirements.txt` (o "oficial") está atualizado e sem duplicidade com `pyproject.toml`
+- [x ] Confirmar que `.env.example` não expõe nenhuma credencial real, só placeholders
+- [x ] Dar uma passada nas pastas `data/`, `notebooks/`, `src/`, `resources/`, `tests/`, `docs/` e garantir que cada uma tem só o que faz sentido publicar (ex.: dados brutos do Kaggle não deveriam estar versionados se forem grandes — usar `.gitignore` e deixar instrução de download no README)
+- [x ] Checar se `.temp_databricks` deveria estar no `.gitignore` (parece artefato temporário de sincronização com o workspace)
+- [x ] Adicionar `CONTRIBUTING.md` é opcional, mas pelo menos garantir que a `LICENSE` está correta (você já tem MIT)
+- [x ] Corrigir o badge do CI no topo do README, que aponta pro placeholder `<seu-usuario>` em vez do seu usuário real
+-???? [ ] Se o CI (`.github/workflows`) não está de fato rodando com sucesso, considerar remover o badge até estar verde — badge quebrado passa impressão pior que nenhum badge
+- ???[ ] Nomear os notebooks com prefixo numérico consistente (ex.: `01_ingestao_bronze_autoloader.py`, `02_...`) refletindo a ordem real do pipeline, para quem abre a pasta `notebooks/` entender o fluxo sem precisar ler o README
+
+## 📄 README.md
+
+- [ X] [SOLICITAR PARA ADICIONAR A SESSÃO]   Adicionar uma seção **"Sobre este projeto"** logo no topo (2-3 frases): quem você é, por que fez, qual o resultado principal (AUC 0,86 / R$13,45 milhões de ganho líquido estimado)
+- [X ] Resolver a contradição entre "Status: Em andamento — só Bronze implementado" e os resultados completos (SHAP, threshold, impacto financeiro) que aparecem logo depois — escolher uma narrativa única e deixar clara a distinção entre "prototipagem/exploração" e "produção"
+- [X ] Reescrever a seção final ("RESPONDENDO AS PERGUNTAS") em tom de relatório/case study, removendo frases de conversa tipo "Excelente, o notebook rodou de ponta a ponta! Vou traduzir..."
+- [ ] ??? Adicionar pelo menos 2-3 visuais: gráfico de importância SHAP, curva ROC, e/ou diagrama simples da arquitetura Bronze→Silver→Gold→Produção (pode ser Mermaid direto no markdown)
+- [ ]???  Revisar os links (Kaggle, BACEN) para garantir que abrem corretamente
+- [ ]??? Adicionar uma seção curta de **"Como rodar"** (setup local, ou como importar no Databricks) — mesmo que básica, mostra que o projeto é reprodutível
+- [ ]??? Adicionar uma seção final **"Próximos passos"** listando as fases restantes do roadmap de 9 fases (mostra que você tem visão de produto, não só entregou um notebook solto)
+- [ ]??? Revisar toda a formatação markdown (títulos, tabelas) depois das mudanças — o GitHub renderiza diferente do que aparece bruto, vale conferir a prévia
+- [ ]??? Opcional, mas forte: adicionar um GIF ou screenshot do endpoint de Model Serving funcionando, ou do dashboard de monitoramento, se já existir algo rodando

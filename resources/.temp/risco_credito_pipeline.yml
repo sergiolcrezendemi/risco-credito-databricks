@@ -1,0 +1,95 @@
+# resources/risco_credito_pipeline.yml
+# ==============================================================================
+# Job que orquestra o pipeline ponta a ponta. O ambiente do Job é declarado
+# aqui de forma explícita (environments.spec.dependencies) — não depende do
+# %uv sync que roda nos notebooks em dev interativo. São dois mecanismos
+# propositalmente separados:
+#   - dev interativo (Git Folder Serverless) -> pyproject.toml + %uv sync
+#   - execução agendada (este Job)           -> ambiente fixado aqui
+# Se adicionar uma dependência nova ao pyproject.toml para uso em notebook,
+# replique a mesma entrada na lista `dependencies` abaixo se ela também for
+# usada pelos notebooks deste pipeline.
+#
+# 00_reset_ambiente.py é destrutivo (DROP TABLE) e não entra neste job
+# recorrente de propósito — continua só para execução manual, avulsa.
+# ==============================================================================
+
+resources:
+  jobs:
+    risco_credito_pipeline:
+      name: risco-credito-pipeline-${bundle.target}
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "5"
+            dependencies:
+              - pandas>=2.0
+              - numpy>=1.24
+              - scikit-learn>=1.3
+              - xgboost>=2.0
+              - shap>=0.44
+              - mlflow>=2.10
+              - databricks-sdk>=0.20
+
+      tasks:
+        - task_key: bronze_training
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/ingestao/01_bronze.py
+            base_parameters:
+              catalog: ${var.catalog}
+              dataset: training
+
+        - task_key: bronze_scoring
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/ingestao/01_bronze.py
+            base_parameters:
+              catalog: ${var.catalog}
+              dataset: scoring
+
+        - task_key: silver
+          environment_key: default
+          depends_on:
+            - task_key: bronze_training
+          notebook_task:
+            notebook_path: ../notebooks/ingestao/02_silver.py
+            base_parameters:
+              catalog: ${var.catalog}
+              dataset: training
+
+        - task_key: gold
+          environment_key: default
+          depends_on:
+            - task_key: silver
+          notebook_task:
+            notebook_path: ../notebooks/ingestao/03_gold.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: hipoteses_h1_h4
+          environment_key: default
+          depends_on:
+            - task_key: gold
+          notebook_task:
+            notebook_path: ../notebooks/ml/01_hipoteses_h1_h4.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: vies_threshold_roi
+          environment_key: default
+          depends_on:
+            - task_key: gold
+          notebook_task:
+            notebook_path: ../notebooks/ml/02_vies_threshold_roi.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+      # Sem agendamento por padrão — dispare manualmente (`databricks bundle
+      # run risco_credito_pipeline --target dev`) até decidir a cadência.
+      # Para agendar, descomente e ajuste:
+      # schedule:
+      #   quartz_cron_expression: "0 0 6 * * ?"   # todo dia às 6h
+      #   timezone_id: "America/Sao_Paulo"
+      #   pause_status: PAUSED
