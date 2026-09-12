@@ -29,7 +29,6 @@ resources:
               - scikit-learn>=1.3
               - xgboost>=2.0
               - shap>=0.44
-              - scipy>=1.10
               - mlflow>=2.10
               - databricks-sdk>=0.20
 
@@ -60,26 +59,10 @@ resources:
               catalog: ${var.catalog}
               dataset: training
 
-        # PROPOSTA — CONFIRMAR ANTES DE DEPLOY: sem esta task, bronze_scoring
-        # fica órfão (nada processa o dataset scoring até a Gold) e
-        # notebooks/ml/03_inferencia_batch.py encontra 0 linhas novas para
-        # pontuar. Confirmar que 02_silver.py aceita dataset=scoring e produz
-        # saída compatível com o que 03_gold.py espera antes de habilitar.
-        - task_key: silver_scoring
-          environment_key: default
-          depends_on:
-            - task_key: bronze_scoring
-          notebook_task:
-            notebook_path: ../notebooks/ingestao/02_silver.py
-            base_parameters:
-              catalog: ${var.catalog}
-              dataset: scoring
-
         - task_key: gold
           environment_key: default
           depends_on:
             - task_key: silver
-            - task_key: silver_scoring
           notebook_task:
             notebook_path: ../notebooks/ingestao/03_gold.py
             base_parameters:
@@ -103,40 +86,6 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
 
-        # Depende só de vies_threshold_roi (não de hipoteses_h1_h4) — é de lá
-        # que vem o @champion em credito_risco_xgb; os dois podem rodar em
-        # paralelo já que nenhum bloqueia o outro.
-        - task_key: inferencia_batch
-          environment_key: default
-          depends_on:
-            - task_key: vies_threshold_roi
-          notebook_task:
-            notebook_path: ../notebooks/ml/03_inferencia_batch.py
-            base_parameters:
-              catalog: ${var.catalog}
-
-        # drift_dados e concept_drift não dependem um do outro — os dois só
-        # precisam do lote pontuado por inferencia_batch — então rodam em
-        # paralelo.
-        - task_key: drift_dados
-          environment_key: default
-          depends_on:
-            - task_key: inferencia_batch
-          notebook_task:
-            notebook_path: ../notebooks/monitoracao/01_drift_dados.py
-            base_parameters:
-              catalog: ${var.catalog}
-
-        - task_key: concept_drift
-          environment_key: default
-          depends_on:
-            - task_key: inferencia_batch
-          notebook_task:
-            notebook_path: ../notebooks/monitoracao/02_concept_drift.py
-            base_parameters:
-              catalog: ${var.catalog}
-              simulation_mode: "true"  # trocar para "false" quando existir rótulo real atrasado
-
       # Sem agendamento por padrão — dispare manualmente (`databricks bundle
       # run risco_credito_pipeline --target dev`) até decidir a cadência.
       # Para agendar, descomente e ajuste:
@@ -146,12 +95,29 @@ resources:
       #   pause_status: PAUSED
 
 # ==============================================================================
-# ROADMAP — ainda não construído:
+# ROADMAP — tasks futuras, ainda não construídas (notebooks não existem
+# ainda). Substitui o job.yml antigo, que apontava para esses caminhos antes
+# dos notebooks existirem e quebraria o deploy. Adicionar aqui como novas
+# tasks (dependentes de gold ou do modelo registrado) assim que os notebooks
+# forem criados:
 #
-#   - retreino_modelo — reaproveita notebooks/ml/01_hipoteses_h1_h4.py e/ou
-#       02_vies_threshold_roi.py (já treinam o modelo) — decidir se
-#       "retreino" vira uma task agendada separada (forçando novo treino
-#       mesmo com @champion existente) ou só um novo run manual desses dois
-#       notebooks com um novo alias no Model Registry. Gatilho natural:
-#       alerta de concept_drift acima do limiar.
+#   - inferencia_batch        -> notebooks/ml/03_inferencia_batch.py
+#       Aplica o modelo registrado (Model Registry, alias @champion) sobre
+#       o dataset "scoring" (holdout sem label) e persiste as previsões.
+#
+#   - monitoramento_drift_dados -> notebooks/monitoracao/01_drift_dados.py
+#       DATA DRIFT: a distribuição das features de entrada (fct_credit_profile)
+#       mudou em relação à base de treino? (ex.: Lakehouse Monitoring, PSI/KS
+#       por feature).
+#
+#   - monitoramento_concept_drift -> notebooks/monitoracao/02_concept_drift.py
+#       CONCEPT DRIFT: a relação entre as features e o target mudou? (ex.:
+#       queda de AUC/KS do modelo em produção comparado ao baseline, mesmo
+#       sem drift de dados aparente) — precisa de label real chegando com
+#       atraso (desempenho real da carteira) para comparar contra a previsão.
+#
+#   - retreino_modelo         -> reaproveita notebooks/ml/01_hipoteses_h1_h4.py
+#       e/ou 02_vies_threshold_roi.py (já treinam o modelo) — decidir se
+#       "retreino" vira uma task agendada separada ou só um novo run desses
+#       dois notebooks com um novo alias no Model Registry.
 # ==============================================================================

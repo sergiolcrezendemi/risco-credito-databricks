@@ -3,23 +3,11 @@
 # CAMADA GOLD — STAR SCHEMA PARA TREINO E ANÁLISE
 # Dataset: Give Me Some Credit
 #
-# Constrói duas tabelas a partir da Silver (`{catalog}.silver.give_me_some_credit`
-# + `{catalog}.silver.give_me_some_credit_scoring`, unidas em uma única Gold):
+# Constrói duas tabelas a partir da Silver (`{catalog}.silver.give_me_some_credit`):
 #   - dim_customer         → customer_id, age, num_dependents
 #   - fct_credit_profile   → customer_id + as 10 variáveis explicativas do
 #                            README + total_delinquency_events (derivada) +
 #                            o target
-#
-# TREINO + SCORING NA MESMA GOLD (decisão registrada — ver conversa em
-# docs/roteiro-execucao.md, Fase 7): o dataset scoring é o holdout sem
-# `SeriousDlqin2yrs`, então `target_dlq_2yrs` fica NULO nessas linhas por
-# construção — não por erro de dado. É esse nulo que
-# `notebooks/ml/03_inferencia_batch.py` e os dois notebooks de
-# `notebooks/monitoracao/` usam pra identificar "o que é lote novo a
-# pontuar" dentro de `fct_credit_profile`, em vez de precisar de uma
-# segunda tabela Gold. A alternativa (Gold separada por dataset) foi
-# descartada por exigir reescrever a query dos três notebooks acima, que já
-# assumem tabela única.
 #
 # RECONCILIAÇÃO DE NOMES (Silver consolidada vs. notebooks de análise já
 # escritos — resposta_hipotese_1_2_3_4.ipynb e
@@ -66,49 +54,6 @@ FCT_RENAME_MAP = {
     "num_times_90_days_late": "num_times_90_days_late",
     "target_default_2yrs": "target_dlq_2yrs",
 }
-
-
-def _read_silver_combined(
-    spark: SparkSession,
-    catalog: str,
-    silver_schema: str,
-    training_table_name: str,
-    scoring_table_name: str,
-) -> DataFrame:
-    """Lê a Silver de treino e, se existir, une a de scoring — que não tem
-    `target_default_2yrs` (o CSV de scoring não traz `SeriousDlqin2yrs`), daí
-    entrar com esse valor nulo, no mesmo tipo da coluna de treino, antes do
-    UNION. Falha alto (não segue silenciosamente) se qualquer OUTRA coluna
-    divergir do esperado — schema divergente inesperado é bug de upstream
-    (Silver), não algo pra Gold tentar adivinhar como conciliar."""
-    training_table = f"{catalog}.{silver_schema}.{training_table_name}"
-    scoring_table = f"{catalog}.{silver_schema}.{scoring_table_name}"
-
-    df_training = spark.table(training_table)
-
-    try:
-        df_scoring = spark.table(scoring_table)
-    except Exception:
-        print(f"[AVISO] {scoring_table} não encontrada — Gold construída só com o dataset de treino "
-              f"(sem lote de scoring para inferência/monitoramento).")
-        return df_training
-
-    if "target_default_2yrs" not in df_scoring.columns:
-        target_dtype = dict(df_training.dtypes)["target_default_2yrs"]
-        df_scoring = df_scoring.withColumn("target_default_2yrs", F.lit(None).cast(target_dtype))
-
-    colunas_so_no_scoring = set(df_scoring.columns) - set(df_training.columns)
-    colunas_so_no_training = set(df_training.columns) - set(df_scoring.columns)
-    if colunas_so_no_scoring or colunas_so_no_training:
-        raise RuntimeError(
-            f"[FALHA] Schema de {scoring_table} diverge do esperado em relação a {training_table} "
-            f"além de target_default_2yrs (já tratado). Só no scoring: {colunas_so_no_scoring or '{}'}. "
-            f"Só no treino: {colunas_so_no_training or '{}'}. A suposição de que as duas Silver têm o "
-            f"mesmo schema (menos o target) não se confirmou — checar src/ingestion/silver.py antes "
-            f"de rodar de novo."
-        )
-
-    return df_training.unionByName(df_scoring)
 
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
@@ -160,16 +105,11 @@ def run_gold_ingestion(
     schema: str = "gold",
     silver_schema: str = "silver",
     silver_table_name: str = "give_me_some_credit",
-    scoring_table_name: str = "give_me_some_credit_scoring",
     dim_table_name: str = "dim_customer",
     fct_table_name: str = "fct_credit_profile",
 ) -> None:
     """Orquestra a construção da Gold. Ponto único de entrada para o
     notebook `notebooks/ingestao/03_gold.py`.
-
-    Une a Silver de treino com a de scoring (se existir) antes de construir
-    dim/fct — é o que dá origem às linhas com `target_dlq_2yrs` nulo que a
-    Fase 7 (inferência batch + monitoramento) espera encontrar.
 
     Gold aqui é um recálculo determinístico em batch a partir de um
     snapshot completo da Silver — não streaming: a Silver já garante
@@ -178,12 +118,13 @@ def run_gold_ingestion(
     complexidade de merge desnecessária numa camada que não tem estado
     próprio, só reflete a Silver).
     """
+    silver_table = f"{catalog}.{silver_schema}.{silver_table_name}"
     dim_table = f"{catalog}.{schema}.{dim_table_name}"
     fct_table = f"{catalog}.{schema}.{fct_table_name}"
 
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
 
-    df_silver = _read_silver_combined(spark, catalog, silver_schema, silver_table_name, scoring_table_name)
+    df_silver = spark.table(silver_table)
 
     df_dim = build_dim_customer(df_silver)
     df_fct = build_fct_credit_profile(df_silver)

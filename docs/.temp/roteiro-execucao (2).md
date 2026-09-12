@@ -93,11 +93,6 @@ Checagens específicas:
 - Rodar `02_vies_threshold_roi.py` uma segunda vez deve carregar o modelo
   do Registry, não treinar de novo
 
-`02_vies_threshold_roi.py` é o único notebook de treino oficial (registra
-`credito_risco_xgb`). Um outro notebook (`04_treino_mlflow.py`, que
-comparava XGBoost vs. Regressão Logística sob o nome `credito_risco_score`)
-foi decomissionado — não deve estar em `notebooks/ml/`.
-
 ---
 
 ## Fase 6 — Teste do modelo (sanity check antes de aceitar o campeão)
@@ -108,7 +103,7 @@ está íntegro e se comporta como esperado antes de confiar nele.
 
 | O quê | Como | O que esperar |
 |---|---|---|
-| Carregar pelo alias | `mlflow.xgboost.load_model(f"models:/{catalog}.gold.credito_risco_xgb@champion")` | Carrega sem erro — se falhar, o alias não existe ou a versão foi removida |
+| Carregar pelo alias | `mlflow.pyfunc.load_model(f"models:/{catalog}.gold.credito_risco_score@champion")` | Carrega sem erro — se falhar, o alias não existe ou a versão foi removida |
 | Rodar contra o dataset `scoring` (holdout, sem target) | `modelo.predict(X_scoring)` | Vetor de probabilidades entre 0 e 1, sem `NaN`, mesmo tamanho de `X_scoring` |
 | Conferir a métrica batida com o Registry | `mlflow.search_runs(...)` pelo `run_id` do `@champion`, comparar `auc_roc` do run com o recalculado agora em `X_test` | Mesma ordem de grandeza (~0,85–0,87) — divergência grande indica *training-serving skew* |
 | Teste de contrato de schema | Chamar `predict()` removendo uma coluna da `signature` registrada | Deve **falhar** com erro de schema — se passar silenciosamente, a `signature` não está protegendo a entrada |
@@ -145,29 +140,6 @@ treino e de scoring no Gold é feita por `target_dlq_2yrs IS NULL`
 essa coluna. Se o Silver/Gold real usar tabelas separadas em vez disso,
 ajustar o `WHERE`/`FROM` nos três — o resto da lógica não muda.
 
-### Testes unitários da Fase 7
-
-Seguindo o padrão já adotado no projeto (notebook fino / lógica testável
-em `src/`), a parte de cada notebook que não depende de spark/dbutils/
-mlflow foi extraída para `src/risco_credito/` e coberta por pytest —
-roda sem cluster, direto no `lint-and-test` do CI:
-
-| Notebook | Lógica extraída para | Testada em |
-|---|---|---|
-| `03_inferencia_batch.py` | `src/ml/decisao.py` — `classificar_decisao()` | `tests/test_decisao.py` (6 testes: limites do threshold, intervalo [0,1] inválido) |
-| `01_drift_dados.py` | `src/monitoring/data_drift.py` — `calcular_psi()`, `classificar_psi()` | `tests/test_data_drift.py` (10 testes: PSI zero em distribuições idênticas, cresce com o deslocamento, ignora NaN, limiares moderado/severo) |
-| `02_concept_drift.py` | `src/monitoring/concept_drift.py` — `avaliar_queda_auc()`, `gerar_lote_sintetico()` | `tests/test_concept_drift.py` (7 testes, incluindo um de integração: treina uma Regressão Logística na referência e confirma que a AUC cai no lote com concept drift simulado) |
-
-Import nos notebooks segue o padrão do projeto (`_find_repo_root()` +
-`sys.path.append(repo_root)` + `from src.monitoring.X import Y`) — não
-`from risco_credito.X import Y`, que não existe como pacote neste repo.
-
-Rodar tudo:
-```
-pytest tests/ -v
-```
-33 testes, todos passando localmente antes desta entrega.
-
 ---
 
 ## Em construção (roadmap, sem notebook ainda)
@@ -181,32 +153,14 @@ pytest tests/ -v
 
 ## Execução automatizada (Job)
 
-As fases 1, 3, 5 e 7 já estão encadeadas em
-`resources/risco_credito_pipeline.yml` (10 tasks: `bronze_training`,
-`bronze_scoring`, `silver`, `silver_scoring`, `gold`, `hipoteses_h1_h4`,
-`vies_threshold_roi`, `inferencia_batch`, `drift_dados`, `concept_drift`).
-A Fase 0 (reset) continua fora de propósito — é destrutiva e manual. A
-Fase 6 (teste do modelo) ainda não tem notebook, então também não está no
-Job.
+As fases 1-5 já estão encadeadas em `resources/risco_credito_pipeline.yml`.
+As fases 6 e 7 (teste do modelo, inferência batch e os dois monitoramentos)
+ainda **não** foram adicionadas como tasks nesse arquivo — hoje só existem
+como comentário de roadmap lá dentro. Rode os notebooks novos manualmente
+por enquanto; adicionar as tasks (`inferencia_batch` → `drift_dados` +
+`concept_drift`) é o próximo passo natural de automação.
 
-Duas pendências antes de rodar em produção:
-- **`silver_scoring`** foi adicionada ao YAML como proposta, ainda **não
-  confirmada** — sem ela, `bronze_scoring` fica órfão e `inferencia_batch`
-  não encontra dado novo pra pontuar (a Fase 7 depende de
-  `target_dlq_2yrs IS NULL` existir na Gold, o que só acontece se o
-  scoring passar pela Silver também). Confirmar contra `02_silver.py`
-  antes do primeiro deploy real.
-- O ambiente do Job precisa de `scipy>=1.10` (usado por `01_drift_dados.py`
-  e `02_concept_drift.py`) — já adicionado em
-  `environments.spec.dependencies` no YAML.
-
-Duas formas de cadastrar o job — escolher uma, não as duas (senão duplica):
-- **Via Bundle (CLI, recomendado — fica versionado no Git):**
-  ```
-  databricks bundle validate -t dev
-  databricks bundle deploy -t dev
-  databricks bundle run risco_credito_pipeline -t dev
-  ```
-- **Via UI (Jobs & Pipelines > Create Job):** replicar as 10 tasks e o
-  ambiente manualmente — mais rápido pra testar uma vez, mas não fica
-  versionado e pode duplicar se depois rodar o Bundle também.
+```
+databricks bundle deploy --target dev
+databricks bundle run risco_credito_pipeline --target dev
+```
