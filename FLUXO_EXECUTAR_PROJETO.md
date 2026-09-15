@@ -16,3 +16,4 @@ github= https://github.com/sergiolcrezendemi/risco-credito-databricks
        vide:
          https://docs.google.com/document/d/1NoYTqtokB1ekrMLYnKk-13FwV9Et3mgHKDxLlfOke9M/edit?tab=t.los229xjemt5#heading=h.mcbqookt4l4l
 
+

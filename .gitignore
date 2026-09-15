@@ -9,3 +9,4 @@ data/processed/
 .env
 *.pem
 .temp_del*/
+*.egg-info/
