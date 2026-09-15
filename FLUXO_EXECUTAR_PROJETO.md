@@ -11,4 +11,8 @@ github= https://github.com/sergiolcrezendemi/risco-credito-databricks
 ## FLUXO
 - 1- executar a job: job_ingestao
         notebook\[...] ->  src\[...]
-- 2-
+- ponto de atenção:
+    precisa configurar a maquina onde esta o fonte com o pyproject.toml
+       vide:
+         https://docs.google.com/document/d/1NoYTqtokB1ekrMLYnKk-13FwV9Et3mgHKDxLlfOke9M/edit?tab=t.los229xjemt5#heading=h.mcbqookt4l4l
+
