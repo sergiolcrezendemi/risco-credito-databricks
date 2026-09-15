@@ -10,7 +10,6 @@
 # ==============================================================================
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -96,16 +95,26 @@ def train_models(X_train: pd.DataFrame, y_train: pd.Series, seed: int = 42) -> t
     """XGBoost (principal) + Regressão Logística (baseline interpretável) — ver README."""
     neg, pos = (y_train == 0).sum(), (y_train == 1).sum()
     xgb_model = XGBClassifier(
-        n_estimators=300, learning_rate=0.05, max_depth=4,
-        scale_pos_weight=float(neg / pos), subsample=0.8, colsample_bytree=0.8,
-        random_state=seed, eval_metric="auc",
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=4,
+        scale_pos_weight=float(neg / pos),
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=seed,
+        eval_metric="auc",
     )
     xgb_model.fit(X_train, y_train)
 
-    logreg_pipeline = Pipeline([
-        ("scaler", StandardScaler()),
-        ("logreg", LogisticRegression(class_weight="balanced", max_iter=1000, random_state=seed)),
-    ])
+    logreg_pipeline = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            (
+                "logreg",
+                LogisticRegression(class_weight="balanced", max_iter=1000, random_state=seed),
+            ),
+        ]
+    )
     logreg_pipeline.fit(X_train, y_train)
     return xgb_model, logreg_pipeline
 
@@ -121,7 +130,9 @@ def run_training(spark, catalog: str, schema: str = "gold", seed: int = 42) -> T
     print(f"ROC-AUC XGBoost: {roc_auc_score(y_test, y_pred_xgb):.4f}")
     print(f"ROC-AUC Regressão Logística: {roc_auc_score(y_test, y_pred_logreg):.4f}")
 
-    return TrainedModels(xgb_model, logreg_pipeline, X_test, y_test, y_pred_xgb, y_pred_logreg, feature_names)
+    return TrainedModels(
+        xgb_model, logreg_pipeline, X_test, y_test, y_pred_xgb, y_pred_logreg, feature_names
+    )
 
 
 def compute_shap(models: TrainedModels, sample_size: int = 2000, seed: int = 42):
@@ -140,29 +151,65 @@ def compute_shap(models: TrainedModels, sample_size: int = 2000, seed: int = 42)
 
 
 def get_logreg_coefficients(models: TrainedModels) -> pd.DataFrame:
-    return pd.DataFrame({
-        "feature": models.feature_names,
-        "coeficiente_logreg": models.logreg_pipeline.named_steps["logreg"].coef_[0],
-    }).sort_values("coeficiente_logreg", ascending=False).reset_index(drop=True)
+    return (
+        pd.DataFrame(
+            {
+                "feature": models.feature_names,
+                "coeficiente_logreg": models.logreg_pipeline.named_steps["logreg"].coef_[0],
+            }
+        )
+        .sort_values("coeficiente_logreg", ascending=False)
+        .reset_index(drop=True)
+    )
 
 
-def validate_h1(shap_sample, shap_values, shap_importance_df, feature="revolving_utilization", corr_threshold=0.05) -> dict:
+def validate_h1(
+    shap_sample,
+    shap_values,
+    shap_importance_df,
+    feature="revolving_utilization",
+    corr_threshold=0.05,
+) -> dict:
     """H1 — utilização de crédito rotativo. Ver README: correlação feature×SHAP."""
     corr = float(np.corrcoef(shap_sample[feature], shap_values[:, feature].values)[0, 1])
     pos = int(shap_importance_df[shap_importance_df["feature"] == feature].index[0] + 1)
-    shap_val = float(shap_importance_df.loc[shap_importance_df["feature"] == feature, "mean_abs_shap"].values[0])
+    shap_val = float(
+        shap_importance_df.loc[shap_importance_df["feature"] == feature, "mean_abs_shap"].values[0]
+    )
     status = "Confirmada" if corr > corr_threshold else "Contrariada / Inconclusiva"
-    return {"status": status, "correlacao": corr, "posicao_ranking": pos, "mean_abs_shap": shap_val, "feature": feature}
+    return {
+        "status": status,
+        "correlacao": corr,
+        "posicao_ranking": pos,
+        "mean_abs_shap": shap_val,
+        "feature": feature,
+    }
 
 
-def validate_h2(shap_importance_df, feature_a="debt_ratio", feature_b="age", relative_margin=0.10) -> dict:
+def validate_h2(
+    shap_importance_df, feature_a="debt_ratio", feature_b="age", relative_margin=0.10
+) -> dict:
     """H2 — dívida/renda vs. idade. Ver README: diferença relativa de |SHAP| médio."""
-    shap_a = float(shap_importance_df.loc[shap_importance_df["feature"] == feature_a, "mean_abs_shap"].values[0])
-    shap_b = float(shap_importance_df.loc[shap_importance_df["feature"] == feature_b, "mean_abs_shap"].values[0])
+    shap_a = float(
+        shap_importance_df.loc[shap_importance_df["feature"] == feature_a, "mean_abs_shap"].values[
+            0
+        ]
+    )
+    shap_b = float(
+        shap_importance_df.loc[shap_importance_df["feature"] == feature_b, "mean_abs_shap"].values[
+            0
+        ]
+    )
     relative_diff = (shap_a - shap_b) / shap_b if shap_b > 0 else float("inf")
     status = "Confirmada" if relative_diff > relative_margin else "Contrariada / Inconclusiva"
-    return {"status": status, "diferenca_relativa": relative_diff, "shap_a": shap_a, "shap_b": shap_b,
-            "feature_a": feature_a, "feature_b": feature_b}
+    return {
+        "status": status,
+        "diferenca_relativa": relative_diff,
+        "shap_a": shap_a,
+        "shap_b": shap_b,
+        "feature_a": feature_a,
+        "feature_b": feature_b,
+    }
 
 
 def validate_h3(y_test, y_pred_xgb, min_approval_rate: float = 0.70) -> dict:
@@ -174,8 +221,13 @@ def validate_h3(y_test, y_pred_xgb, min_approval_rate: float = 0.70) -> dict:
         approved = y_pred_xgb < t
         approval_rate = float(approved.mean())
         default_rate_approved = float(y_test[approved].mean()) if approved.sum() > 0 else np.nan
-        rows.append({"threshold": round(float(t), 2), "approval_rate": approval_rate,
-                      "default_rate_approved": default_rate_approved})
+        rows.append(
+            {
+                "threshold": round(float(t), 2),
+                "approval_rate": approval_rate,
+                "default_rate_approved": default_rate_approved,
+            }
+        )
     threshold_df = pd.DataFrame(rows)
 
     viable = threshold_df[threshold_df["approval_rate"] >= min_approval_rate]
@@ -187,22 +239,33 @@ def validate_h3(y_test, y_pred_xgb, min_approval_rate: float = 0.70) -> dict:
         best_row, reduction = None, None
         status = "Inconclusiva (nenhum threshold atinge o piso de aprovação definido)"
 
-    return {"status": status, "threshold_df": threshold_df, "best_row": best_row,
-            "reduction": reduction, "baseline_default_rate": baseline_default_rate,
-            "min_approval_rate": min_approval_rate}
+    return {
+        "status": status,
+        "threshold_df": threshold_df,
+        "best_row": best_row,
+        "reduction": reduction,
+        "baseline_default_rate": baseline_default_rate,
+        "min_approval_rate": min_approval_rate,
+    }
 
 
 def validate_h4(
-    y_test, y_pred_xgb, h3_result: dict,
+    y_test,
+    y_pred_xgb,
+    h3_result: dict,
     perda_media_inadimplencia: float = PERDA_MEDIA_POR_INADIMPLENCIA_R,
     margem_media_bom_pagador: float = MARGEM_MEDIA_POR_CLIENTE_BOM_R,
 ) -> dict:
     """H4 — impacto financeiro. Ver README: herda o threshold de H3."""
     best_row = h3_result["best_row"]
     if best_row is None:
-        return {"status": "Não calculada (H3 não encontrou threshold viável)",
-                "perda_evitada": None, "custo_oportunidade": None, "impacto_liquido": None,
-                "threshold_usado": None}
+        return {
+            "status": "Não calculada (H3 não encontrou threshold viável)",
+            "perda_evitada": None,
+            "custo_oportunidade": None,
+            "impacto_liquido": None,
+            "threshold_usado": None,
+        }
 
     t_final = best_row["threshold"]
     approved = y_pred_xgb < t_final
@@ -216,55 +279,75 @@ def validate_h4(
     impacto_liquido = perda_evitada - custo_oportunidade
     status = "Confirmada" if impacto_liquido > 0 else "Contrariada / Inconclusiva"
 
-    return {"status": status, "threshold_usado": t_final,
-            "maus_pagadores_evitados": maus_pagadores_evitados, "perda_evitada": perda_evitada,
-            "bons_pagadores_rejeitados": bons_pagadores_rejeitados, "custo_oportunidade": custo_oportunidade,
-            "impacto_liquido": impacto_liquido}
+    return {
+        "status": status,
+        "threshold_usado": t_final,
+        "maus_pagadores_evitados": maus_pagadores_evitados,
+        "perda_evitada": perda_evitada,
+        "bons_pagadores_rejeitados": bons_pagadores_rejeitados,
+        "custo_oportunidade": custo_oportunidade,
+        "impacto_liquido": impacto_liquido,
+    }
 
 
 def build_hypotheses_summary(h1: dict, h2: dict, h3: dict, h4: dict) -> pd.DataFrame:
     best_row = h3["best_row"]
-    return pd.DataFrame([
-        {
-            "hipotese": "H1",
-            "descricao": "Clientes com maior revolving_utilization têm maior probabilidade de inadimplência",
-            "metrica": h1["correlacao"], "status": h1["status"],
-            "evidencia": f"Correlação SHAP-Feature de {h1['correlacao']:.4f}. Posição {h1['posicao_ranking']}º no ranking SHAP.",
-            "limitacao": "Não testa o mecanismo causal ('menor folga financeira'), apenas associação via SHAP.",
-        },
-        {
-            "hipotese": "H2",
-            "descricao": "debt_ratio tem poder preditivo maior que age isoladamente",
-            "metrica": h2["diferenca_relativa"], "status": h2["status"],
-            "evidencia": f"debt_ratio SHAP ({h2['shap_a']:.4f}) vs age SHAP ({h2['shap_b']:.4f}). Diferença relativa: {h2['diferenca_relativa']:.2%}.",
-            "limitacao": "Compara só com 'age', não com o 'perfil demográfico' como um todo.",
-        },
-        {
-            "hipotese": "H3",
-            "descricao": "Existe threshold que reduz inadimplência da carteira aprovada sem violar piso de aprovação",
-            "metrica": h3["reduction"] if h3["reduction"] is not None else np.nan, "status": h3["status"],
-            "evidencia": (
-                f"Threshold {best_row['threshold']}, aprovação {best_row['approval_rate']:.2%}, "
-                f"inadimplência aprovados {best_row['default_rate_approved']:.2%}"
-                if best_row is not None else "Nenhum threshold atingiu o piso de aprovação definido."
-            ),
-            "limitacao": "Não testa estabilidade do threshold ao longo do tempo (drift).",
-        },
-        {
-            "hipotese": "H4",
-            "descricao": "Impacto financeiro líquido de aplicar o modelo (perda evitada vs. custo de oportunidade)",
-            "metrica": h4["impacto_liquido"] if h4["impacto_liquido"] is not None else np.nan, "status": h4["status"],
-            "evidencia": (
-                f"Perda evitada: R$ {h4['perda_evitada']:,.2f} | Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}"
-                if h4["impacto_liquido"] is not None else "Dependente de H3."
-            ),
-            "limitacao": "Valores de perda/margem são ilustrativos — substituir por dados financeiros reais da Mezzo.",
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "hipotese": "H1",
+                "descricao": "Clientes com maior revolving_utilization têm maior probabilidade de inadimplência",
+                "metrica": h1["correlacao"],
+                "status": h1["status"],
+                "evidencia": f"Correlação SHAP-Feature de {h1['correlacao']:.4f}. Posição {h1['posicao_ranking']}º no ranking SHAP.",
+                "limitacao": "Não testa o mecanismo causal ('menor folga financeira'), apenas associação via SHAP.",
+            },
+            {
+                "hipotese": "H2",
+                "descricao": "debt_ratio tem poder preditivo maior que age isoladamente",
+                "metrica": h2["diferenca_relativa"],
+                "status": h2["status"],
+                "evidencia": f"debt_ratio SHAP ({h2['shap_a']:.4f}) vs age SHAP ({h2['shap_b']:.4f}). Diferença relativa: {h2['diferenca_relativa']:.2%}.",
+                "limitacao": "Compara só com 'age', não com o 'perfil demográfico' como um todo.",
+            },
+            {
+                "hipotese": "H3",
+                "descricao": "Existe threshold que reduz inadimplência da carteira aprovada sem violar piso de aprovação",
+                "metrica": h3["reduction"] if h3["reduction"] is not None else np.nan,
+                "status": h3["status"],
+                "evidencia": (
+                    f"Threshold {best_row['threshold']}, aprovação {best_row['approval_rate']:.2%}, "
+                    f"inadimplência aprovados {best_row['default_rate_approved']:.2%}"
+                    if best_row is not None
+                    else "Nenhum threshold atingiu o piso de aprovação definido."
+                ),
+                "limitacao": "Não testa estabilidade do threshold ao longo do tempo (drift).",
+            },
+            {
+                "hipotese": "H4",
+                "descricao": "Impacto financeiro líquido de aplicar o modelo (perda evitada vs. custo de oportunidade)",
+                "metrica": h4["impacto_liquido"] if h4["impacto_liquido"] is not None else np.nan,
+                "status": h4["status"],
+                "evidencia": (
+                    f"Perda evitada: R$ {h4['perda_evitada']:,.2f} | Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}"
+                    if h4["impacto_liquido"] is not None
+                    else "Dependente de H3."
+                ),
+                "limitacao": "Valores de perda/margem são ilustrativos — substituir por dados financeiros reais da Mezzo.",
+            },
+        ]
+    )
 
 
-def persist_hypotheses_summary(spark, summary_df: pd.DataFrame, catalog: str, schema: str = "gold",
-                                table_name: str = "gold_hypotheses_validation") -> None:
+def persist_hypotheses_summary(
+    spark,
+    summary_df: pd.DataFrame,
+    catalog: str,
+    schema: str = "gold",
+    table_name: str = "gold_hypotheses_validation",
+) -> None:
     target_table = f"{catalog}.{schema}.{table_name}"
-    spark.createDataFrame(summary_df).write.mode("overwrite").format("delta").saveAsTable(target_table)
+    spark.createDataFrame(summary_df).write.mode("overwrite").format("delta").saveAsTable(
+        target_table
+    )
     print(f"[OK] Tabela salva: {target_table}")

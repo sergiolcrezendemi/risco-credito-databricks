@@ -8,6 +8,7 @@ FILE_ROUTING = {
     "test": "scoring",  # cs-test.csv vai para scoring
 }
 
+
 def mover_arquivos():
     arquivos = dbutils.fs.ls(VOLUME_BASE)
 
@@ -35,5 +36,6 @@ def mover_arquivos():
         dbutils.fs.mv(origem, destino)
 
     print("✅ Concluído.")
+
 
 mover_arquivos()

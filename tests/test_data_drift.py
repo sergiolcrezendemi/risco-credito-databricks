@@ -1,6 +1,7 @@
 """
 Testes para src/risco_credito/monitoring/data_drift.py
 """
+
 import numpy as np
 import pytest
 

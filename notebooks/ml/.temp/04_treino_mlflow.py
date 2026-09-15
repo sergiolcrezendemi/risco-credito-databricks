@@ -39,24 +39,23 @@
 # =========================
 # 0. CONFIGURAÇÃO
 # =========================
+import logging
+
+import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-import numpy as np
-import pandas as pd
 import shap
 import xgboost as xgb
-import matplotlib.pyplot as plt
-import logging
-from scipy.stats import ks_2samp
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import roc_auc_score, precision_recall_curve
 from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
+from scipy.stats import ks_2samp
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_recall_curve, roc_auc_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 mlflow.set_registry_uri("databricks-uc")
@@ -66,8 +65,10 @@ CATALOG = "credito_prd"
 SCHEMA = "gold"
 FCT_TABLE = "fct_credit_profile"
 DIM_CUSTOMER_TABLE = "dim_customer"
-TARGET_COL = "target_dlq_2yrs"                 # 1 = inadimplente, 0 = bom pagador
-MODEL_NAME = f"{CATALOG}.{SCHEMA}.credito_risco_score"   # nome único no Registry (agnóstico ao algoritmo)
+TARGET_COL = "target_dlq_2yrs"  # 1 = inadimplente, 0 = bom pagador
+MODEL_NAME = (
+    f"{CATALOG}.{SCHEMA}.credito_risco_score"  # nome único no Registry (agnóstico ao algoritmo)
+)
 
 # --- Precisão-alvo para a métrica de recall (Q2 do README) ---
 # Ponto de partida documentado — validar com a área de negócio antes de qualquer uso
@@ -75,7 +76,9 @@ MODEL_NAME = f"{CATALOG}.{SCHEMA}.credito_risco_score"   # nome único no Regist
 PRECISAO_ALVO = 0.30
 
 # --- Regra de decisão entre modelos ---
-MARGEM_EMPATE_TECNICO = 0.005   # se a diferença de AUC-ROC for menor que isto, cai para o interpretável
+MARGEM_EMPATE_TECNICO = (
+    0.005  # se a diferença de AUC-ROC for menor que isto, cai para o interpretável
+)
 
 # COMMAND ----------
 
@@ -107,14 +110,24 @@ n_antes = len(df)
 df = df.dropna(subset=[TARGET_COL])
 n_removidos = n_antes - len(df)
 if n_removidos > 0:
-    print(f"[AVISO] {n_removidos} de {n_antes} registros removidos por '{TARGET_COL}' nulo "
-          f"({n_removidos / n_antes:.2%}).")
+    print(
+        f"[AVISO] {n_removidos} de {n_antes} registros removidos por '{TARGET_COL}' nulo "
+        f"({n_removidos / n_antes:.2%})."
+    )
 df[TARGET_COL] = df[TARGET_COL].astype(int)
 
 FEATURE_COLS = [
-    "age", "num_dependents", "monthly_income", "debt_ratio", "revolving_utilization",
-    "num_open_credit_lines", "num_real_estate_loans", "num_times_30_59_days_late",
-    "num_times_60_89_days_late", "num_times_90_days_late", "total_delinquency_events",
+    "age",
+    "num_dependents",
+    "monthly_income",
+    "debt_ratio",
+    "revolving_utilization",
+    "num_open_credit_lines",
+    "num_real_estate_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "total_delinquency_events",
 ]
 
 X = df[FEATURE_COLS]
@@ -123,8 +136,10 @@ y = df[TARGET_COL]
 nulos_por_coluna = X.isna().sum()
 nulos_por_coluna = nulos_por_coluna[nulos_por_coluna > 0]
 if not nulos_por_coluna.empty:
-    print("[AVISO] Colunas com valores nulos nas features (imputadas com mediana para a "
-          "Regressão Logística; o XGBoost lida com NaN nativamente):")
+    print(
+        "[AVISO] Colunas com valores nulos nas features (imputadas com mediana para a "
+        "Regressão Logística; o XGBoost lida com NaN nativamente):"
+    )
     for col, qtd in nulos_por_coluna.items():
         print(f"  {col}: {qtd} ({qtd / len(X):.2%})")
 
@@ -139,6 +154,7 @@ print(f"Treino: {len(X_train)} linhas | Teste: {len(X_test)} linhas")
 print(f"Taxa positiva (treino): {taxa_positiva:.4f} | scale_pos_weight: {scale_pos_weight:.2f}")
 
 # COMMAND ----------
+
 
 # =========================
 # 2. MÉTRICAS DE AVALIAÇÃO — funções reaproveitadas nos dois modelos
@@ -173,19 +189,23 @@ def avaliar(y_true, y_proba):
         ),
     }
 
+
 # COMMAND ----------
 
 # =========================
 # 3. MODELO 1 — REGRESSÃO LOGÍSTICA (baseline interpretável)
 # =========================
 with mlflow.start_run(run_name="logistic_regression") as run_lr:
-    pipeline_lr = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),  # LogisticRegression não aceita NaN nativamente
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(
-            class_weight="balanced", max_iter=1000, random_state=42
-        )),
-    ])
+    pipeline_lr = Pipeline(
+        [
+            (
+                "imputer",
+                SimpleImputer(strategy="median"),
+            ),  # LogisticRegression não aceita NaN nativamente
+            ("scaler", StandardScaler()),
+            ("clf", LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)),
+        ]
+    )
     pipeline_lr.fit(X_train, y_train)
     proba_lr = pipeline_lr.predict_proba(X_test)[:, 1]
     metricas_lr = avaliar(y_test, proba_lr)
@@ -198,15 +218,19 @@ with mlflow.start_run(run_name="logistic_regression") as run_lr:
 
     assinatura_lr = infer_signature(X_train, pipeline_lr.predict_proba(X_train)[:, 1])
     mlflow.sklearn.log_model(
-        pipeline_lr, "model",
-        signature=assinatura_lr, input_example=X_train.head(5),
+        pipeline_lr,
+        "model",
+        signature=assinatura_lr,
+        input_example=X_train.head(5),
     )
     run_id_lr = run_lr.info.run_id
 
-print(f"[Regressão Logística] AUC-ROC: {metricas_lr['auc_roc']:.4f} | "
-      f"KS: {metricas_lr['ks_statistic']:.4f} | "
-      f"Recall@{int(PRECISAO_ALVO*100)}%precisão: "
-      f"{metricas_lr[f'recall_em_{int(PRECISAO_ALVO*100)}pct_precisao']:.4f}")
+print(
+    f"[Regressão Logística] AUC-ROC: {metricas_lr['auc_roc']:.4f} | "
+    f"KS: {metricas_lr['ks_statistic']:.4f} | "
+    f"Recall@{int(PRECISAO_ALVO*100)}%precisão: "
+    f"{metricas_lr[f'recall_em_{int(PRECISAO_ALVO*100)}pct_precisao']:.4f}"
+)
 
 # COMMAND ----------
 
@@ -247,15 +271,19 @@ with mlflow.start_run(run_name="xgboost") as run_xgb:
 
     assinatura_xgb = infer_signature(X_train, modelo_xgb.predict_proba(X_train)[:, 1])
     mlflow.xgboost.log_model(
-        modelo_xgb, "model",
-        signature=assinatura_xgb, input_example=X_train.head(5),
+        modelo_xgb,
+        "model",
+        signature=assinatura_xgb,
+        input_example=X_train.head(5),
     )
     run_id_xgb = run_xgb.info.run_id
 
-print(f"[XGBoost] AUC-ROC: {metricas_xgb['auc_roc']:.4f} | "
-      f"KS: {metricas_xgb['ks_statistic']:.4f} | "
-      f"Recall@{int(PRECISAO_ALVO*100)}%precisão: "
-      f"{metricas_xgb[f'recall_em_{int(PRECISAO_ALVO*100)}pct_precisao']:.4f}")
+print(
+    f"[XGBoost] AUC-ROC: {metricas_xgb['auc_roc']:.4f} | "
+    f"KS: {metricas_xgb['ks_statistic']:.4f} | "
+    f"Recall@{int(PRECISAO_ALVO*100)}%precisão: "
+    f"{metricas_xgb[f'recall_em_{int(PRECISAO_ALVO*100)}pct_precisao']:.4f}"
+)
 
 # COMMAND ----------
 
@@ -276,8 +304,10 @@ else:
     metricas_vencedoras = metricas_xgb if modelo_vencedor == "xgboost" else metricas_lr
     flavor_vencedor = mlflow.xgboost if modelo_vencedor == "xgboost" else mlflow.sklearn
 
-print(f"\nDiferença de AUC-ROC (XGBoost - Regressão Logística): {diferenca_auc:+.4f} "
-      f"(margem de empate técnico: {MARGEM_EMPATE_TECNICO})")
+print(
+    f"\nDiferença de AUC-ROC (XGBoost - Regressão Logística): {diferenca_auc:+.4f} "
+    f"(margem de empate técnico: {MARGEM_EMPATE_TECNICO})"
+)
 print(f"Modelo vencedor: {modelo_vencedor} | AUC-ROC: {metricas_vencedoras['auc_roc']:.4f}")
 
 # COMMAND ----------
@@ -304,18 +334,26 @@ try:
     auc_champion_atual = float(
         client.get_model_version(MODEL_NAME, versao_champion_atual.version).tags.get("auc_roc", "0")
     )
-    print(f"Champion atual: versão {versao_champion_atual.version}, AUC-ROC {auc_champion_atual:.4f}")
+    print(
+        f"Champion atual: versão {versao_champion_atual.version}, AUC-ROC {auc_champion_atual:.4f}"
+    )
 
     if metricas_vencedoras["auc_roc"] > auc_champion_atual:
         client.set_registered_model_alias(MODEL_NAME, "champion", versao_registrada.version)
-        print(f"Challenger superou o champion — versão {versao_registrada.version} promovida a @champion.")
+        print(
+            f"Challenger superou o champion — versão {versao_registrada.version} promovida a @champion."
+        )
     else:
-        print("Challenger não superou o champion atual — @champion mantido, "
-              "@challenger só fica registrado para inspeção.")
+        print(
+            "Challenger não superou o champion atual — @champion mantido, "
+            "@challenger só fica registrado para inspeção."
+        )
 
 except mlflow.exceptions.RestException:
     # Nenhum @champion ainda existe (primeira execução) — o challenger vira champion direto
     client.set_registered_model_alias(MODEL_NAME, "champion", versao_registrada.version)
-    print(f"Nenhum @champion prévio — versão {versao_registrada.version} promovida a @champion diretamente.")
+    print(
+        f"Nenhum @champion prévio — versão {versao_registrada.version} promovida a @champion diretamente."
+    )
 
 print("\nTreino concluído e registrado no MLflow / Unity Catalog Model Registry.")

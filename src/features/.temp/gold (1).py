@@ -59,8 +59,7 @@ FCT_RENAME_MAP = {
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
     """Dimensão de cliente: atributos demográficos, estáveis por customer_id."""
     return (
-        df_silver
-        .select(*DIM_CUSTOMER_COLUMNS)
+        df_silver.select(*DIM_CUSTOMER_COLUMNS)
         .dropDuplicates(["customer_id"])
         .withColumn("_gold_processed_at", F.current_timestamp())
     )
@@ -75,8 +74,7 @@ def build_fct_credit_profile(df_silver: DataFrame) -> DataFrame:
         df = df.withColumnRenamed(silver_col, gold_col)
 
     return (
-        df
-        .withColumn(
+        df.withColumn(
             "total_delinquency_events",
             F.col("num_times_30_59_days_late")
             + F.col("num_times_60_89_days_late")

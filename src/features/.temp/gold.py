@@ -89,8 +89,10 @@ def _read_silver_combined(
     try:
         df_scoring = spark.table(scoring_table)
     except Exception:
-        print(f"[AVISO] {scoring_table} não encontrada — Gold construída só com o dataset de treino "
-              f"(sem lote de scoring para inferência/monitoramento).")
+        print(
+            f"[AVISO] {scoring_table} não encontrada — Gold construída só com o dataset de treino "
+            f"(sem lote de scoring para inferência/monitoramento)."
+        )
         return df_training
 
     if "target_default_2yrs" not in df_scoring.columns:
@@ -114,8 +116,7 @@ def _read_silver_combined(
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
     """Dimensão de cliente: atributos demográficos, estáveis por customer_id."""
     return (
-        df_silver
-        .select(*DIM_CUSTOMER_COLUMNS)
+        df_silver.select(*DIM_CUSTOMER_COLUMNS)
         .dropDuplicates(["customer_id"])
         .withColumn("_gold_processed_at", F.current_timestamp())
     )
@@ -130,8 +131,7 @@ def build_fct_credit_profile(df_silver: DataFrame) -> DataFrame:
         df = df.withColumnRenamed(silver_col, gold_col)
 
     return (
-        df
-        .withColumn(
+        df.withColumn(
             "total_delinquency_events",
             F.col("num_times_30_59_days_late")
             + F.col("num_times_60_89_days_late")
@@ -183,7 +183,9 @@ def run_gold_ingestion(
 
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
 
-    df_silver = _read_silver_combined(spark, catalog, silver_schema, silver_table_name, scoring_table_name)
+    df_silver = _read_silver_combined(
+        spark, catalog, silver_schema, silver_table_name, scoring_table_name
+    )
 
     df_dim = build_dim_customer(df_silver)
     df_fct = build_fct_credit_profile(df_silver)

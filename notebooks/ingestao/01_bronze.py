@@ -19,7 +19,7 @@ IMPORTANTE
  RODAR COM DUAS OPÇÕES  (responder a pergunta no inicio do cabeçalho)
 
  1- DATASET = training
- 2- DATASEET = scoring       
+ 2- DATASEET = scoring
 
 """
 

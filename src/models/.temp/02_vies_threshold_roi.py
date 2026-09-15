@@ -18,8 +18,8 @@ MODEL_ALIAS = "champion"
 
 # COMMAND ----------
 
-import sys
 import os
+import sys
 
 
 def _find_repo_root(start: str) -> str:
@@ -38,10 +38,11 @@ repo_root = _find_repo_root(os.getcwd())
 if repo_root not in sys.path:
     sys.path.append(repo_root)
 
-from src.models import bias_roi_validation as brv
-from src.models.hypothesis_validation import load_gold_training_data
 import matplotlib.pyplot as plt
 import shap
+
+from src.models import bias_roi_validation as brv
+from src.models.hypothesis_validation import load_gold_training_data
 
 # COMMAND ----------
 
@@ -54,8 +55,15 @@ df = load_gold_training_data(spark, catalog=catalog)
 X_train, X_test, y_train, y_test = brv.prepare_train_test(df)
 
 model = brv.load_or_train_model(
-    spark, catalog=catalog, schema="gold", model_name=MODEL_NAME, model_alias=MODEL_ALIAS,
-    X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+    spark,
+    catalog=catalog,
+    schema="gold",
+    model_name=MODEL_NAME,
+    model_alias=MODEL_ALIAS,
+    X_train=X_train,
+    y_train=y_train,
+    X_test=X_test,
+    y_test=y_test,
 )
 y_proba_test = model.predict_proba(X_test)[:, 1]
 
@@ -103,8 +111,12 @@ print(f"Economia: R$ {threshold_result['economia']:,.2f}")
 df_custos = threshold_result["df_custos"]
 plt.figure(figsize=(8, 5))
 plt.plot(df_custos["threshold"], df_custos["custo_total"])
-plt.axvline(threshold_result["threshold_otimo"], color="red", linestyle="--",
-            label=f"Ótimo = {threshold_result['threshold_otimo']:.2f}")
+plt.axvline(
+    threshold_result["threshold_otimo"],
+    color="red",
+    linestyle="--",
+    label=f"Ótimo = {threshold_result['threshold_otimo']:.2f}",
+)
 plt.xlabel("Threshold de probabilidade")
 plt.ylabel("Custo total esperado (R$)")
 plt.title("Custo esperado vs. Threshold (custo assimétrico)")
@@ -142,12 +154,18 @@ if bias_result["alertas"]:
 
 financial_result = brv.financial_impact(bias_result["df_val"])
 print(f"Operações analisadas: {financial_result['n_operacoes']}")
-print(f"Taxa de inadimplência sem modelo: {financial_result['taxa_sem_modelo']:.2%} "
-      f"-> Perda estimada: R$ {financial_result['perda_sem_modelo']:,.2f}")
-print(f"Taxa de inadimplência com modelo: {financial_result['taxa_com_modelo']:.2%} "
-      f"-> Perda estimada: R$ {financial_result['perda_com_modelo']:,.2f}")
+print(
+    f"Taxa de inadimplência sem modelo: {financial_result['taxa_sem_modelo']:.2%} "
+    f"-> Perda estimada: R$ {financial_result['perda_sem_modelo']:,.2f}"
+)
+print(
+    f"Taxa de inadimplência com modelo: {financial_result['taxa_com_modelo']:.2%} "
+    f"-> Perda estimada: R$ {financial_result['perda_com_modelo']:,.2f}"
+)
 print(f"Redução bruta de inadimplência: R$ {financial_result['reducao_bruta']:,.2f}")
-print(f"Custo de oportunidade (bons pagadores negados): R$ {financial_result['custo_oportunidade']:,.2f}")
+print(
+    f"Custo de oportunidade (bons pagadores negados): R$ {financial_result['custo_oportunidade']:,.2f}"
+)
 print(f"Impacto financeiro líquido estimado: R$ {financial_result['impacto_liquido']:,.2f}")
 
 # COMMAND ----------
@@ -157,4 +175,6 @@ print(f"Impacto financeiro líquido estimado: R$ {financial_result['impacto_liqu
 
 # COMMAND ----------
 
-brv.log_validation_to_mlflow(threshold_result, financial_result, ranking_shap, bias_result, status_h1, status_h2)
+brv.log_validation_to_mlflow(
+    threshold_result, financial_result, ranking_shap, bias_result, status_h1, status_h2
+)

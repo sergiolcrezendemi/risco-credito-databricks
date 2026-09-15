@@ -21,9 +21,7 @@
 # ==============================================================================
 
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType, StructField, IntegerType, DoubleType, LongType
-)
+from pyspark.sql.types import DoubleType, IntegerType, StructField, StructType
 
 CATALOG = "credito_prd"
 SCHEMA = "bronze"
@@ -35,30 +33,31 @@ SCHEMA_LOCATION = f"/Volumes/{CATALOG}/{SCHEMA}/schemas/give_me_some_credit_bron
 
 # 1. Definir o schema explícito (evita inferência em streaming)
 # cs-training possui 12 colunas (incluindo o índice inicial _c0)
-credit_schema = StructType([
-    StructField("_c0", IntegerType(), True),
-    StructField("SeriousDlqin2yrs", IntegerType(), True),
-    StructField("RevolvingUtilizationOfUnsecuredLines", DoubleType(), True),
-    StructField("age", IntegerType(), True),
-    StructField("NumberOfTime30-59DaysPastDueNotWorse", IntegerType(), True),
-    StructField("DebtRatio", DoubleType(), True),
-    StructField("MonthlyIncome", DoubleType(), True),
-    StructField("NumberOfOpenCreditLinesAndLoans", IntegerType(), True),
-    StructField("NumberOfTimes90DaysLate", IntegerType(), True),
-    StructField("NumberRealEstateLoansOrLines", IntegerType(), True),
-    StructField("NumberOfTime60-89DaysPastDueNotWorse", IntegerType(), True),
-    StructField("NumberOfDependents", DoubleType(), True)
-])
+credit_schema = StructType(
+    [
+        StructField("_c0", IntegerType(), True),
+        StructField("SeriousDlqin2yrs", IntegerType(), True),
+        StructField("RevolvingUtilizationOfUnsecuredLines", DoubleType(), True),
+        StructField("age", IntegerType(), True),
+        StructField("NumberOfTime30-59DaysPastDueNotWorse", IntegerType(), True),
+        StructField("DebtRatio", DoubleType(), True),
+        StructField("MonthlyIncome", DoubleType(), True),
+        StructField("NumberOfOpenCreditLinesAndLoans", IntegerType(), True),
+        StructField("NumberOfTimes90DaysLate", IntegerType(), True),
+        StructField("NumberRealEstateLoansOrLines", IntegerType(), True),
+        StructField("NumberOfTime60-89DaysPastDueNotWorse", IntegerType(), True),
+        StructField("NumberOfDependents", DoubleType(), True),
+    ]
+)
 
 # 2. Leitura com cloudFiles sem inferSchema
 df_stream = (
-    spark.readStream
-    .format("cloudFiles")
+    spark.readStream.format("cloudFiles")
     .option("cloudFiles.format", "csv")
     .option("header", "true")
-    .schema(credit_schema) # Schema fornecido: zero custo de inferência
+    .schema(credit_schema)  # Schema fornecido: zero custo de inferência
     .option("cloudFiles.schemaLocation", SCHEMA_LOCATION)
-    .option("pathGlobFilter", "*.csv") # Ignora o .xls
+    .option("pathGlobFilter", "*.csv")  # Ignora o .xls
     .load(RAW_DATA_PATH)
     .withColumnRenamed("_c0", "customer_id")
     .withColumn("_ingestion_timestamp", F.current_timestamp())
@@ -67,8 +66,7 @@ df_stream = (
 
 # 3. Escrita incremental com trigger availableNow (modo micro-batch)
 query = (
-    df_stream.writeStream
-    .format("delta")
+    df_stream.writeStream.format("delta")
     .outputMode("append")
     .option("checkpointLocation", CHECKPOINT_PATH)
     .trigger(availableNow=True)
@@ -132,7 +130,7 @@ print(f"Ingestão via Auto Loader concluída com sucesso na tabela {TABLE_NAME}!
 # else:
 #     # 5. Execução do Delta MERGE (Upsert) - Evita duplicações e atualiza modificações
 #     target_table = DeltaTable.forName(spark, TABLE_NAME)
-    
+
 #     (
 #         target_table.alias("target")
 #         .merge(
@@ -153,9 +151,7 @@ print(f"Ingestão via Auto Loader concluída com sucesso na tabela {TABLE_NAME}!
 # COMMAND ----------
 
 
-
 # COMMAND ----------
-
 
 
 # COMMAND ----------
@@ -200,8 +196,6 @@ print(f"Ingestão via Auto Loader concluída com sucesso na tabela {TABLE_NAME}!
 # )
 
 
-
-
 # # 5. Enriquecimento com Metadados de Auditoria
 # df_bronze = (
 #     df_raw_stream
@@ -222,14 +216,11 @@ print(f"Ingestão via Auto Loader concluída com sucesso na tabela {TABLE_NAME}!
 # )
 
 
-
-
 # query.awaitTermination()
 
 # print(f"Ingestão concluída com sucesso na tabela: {TABLE_NAME}")
 
 # COMMAND ----------
-
 
 
 # COMMAND ----------

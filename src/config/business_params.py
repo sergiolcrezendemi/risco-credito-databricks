@@ -19,6 +19,6 @@
 # é intencional, só a constante de custo em R$ não deveria divergir.
 # ==============================================================================
 
-CUSTO_APROVAR_MAU_PAGADOR = 15000.0   # perda média ao conceder crédito a um mau pagador
-CUSTO_NEGAR_BOM_PAGADOR = 1500.0      # margem perdida ao negar crédito a um bom pagador
-VALOR_MEDIO_OPERACAO = 12000.0        # ticket médio de uma operação de crédito (usado só em Q4)
+CUSTO_APROVAR_MAU_PAGADOR = 15000.0  # perda média ao conceder crédito a um mau pagador
+CUSTO_NEGAR_BOM_PAGADOR = 1500.0  # margem perdida ao negar crédito a um bom pagador
+VALOR_MEDIO_OPERACAO = 12000.0  # ticket médio de uma operação de crédito (usado só em Q4)

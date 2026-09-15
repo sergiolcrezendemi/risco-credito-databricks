@@ -5,13 +5,22 @@ gerador sintético usado em SIMULATION_MODE.
 Puro numpy/pandas — sem spark/dbutils/mlflow — para rodar em pytest sem
 cluster. Usado por notebooks/monitoracao/02_concept_drift.py.
 """
+
 import numpy as np
 import pandas as pd
 
 FEATURE_COLS = [
-    "age", "num_dependents", "monthly_income", "debt_ratio", "revolving_utilization",
-    "num_open_credit_lines", "num_real_estate_loans", "num_times_30_59_days_late",
-    "num_times_60_89_days_late", "num_times_90_days_late", "total_delinquency_events",
+    "age",
+    "num_dependents",
+    "monthly_income",
+    "debt_ratio",
+    "revolving_utilization",
+    "num_open_credit_lines",
+    "num_real_estate_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "total_delinquency_events",
 ]
 
 
@@ -23,7 +32,9 @@ def avaliar_queda_auc(auc_referencia: float, auc_atual: float, limiar: float = 0
     return {"queda_auc": queda, "alerta": queda >= limiar}
 
 
-def gerar_lote_sintetico(n: int, concept_drift: bool, seed: int, target_col: str = "target_dlq_2yrs") -> pd.DataFrame:
+def gerar_lote_sintetico(
+    n: int, concept_drift: bool, seed: int, target_col: str = "target_dlq_2yrs"
+) -> pd.DataFrame:
     """Gera um lote sintético de clientes de crédito. Com concept_drift=True,
     enfraquece o peso de debt_ratio/revolving_utilization na relação com o
     target — simula o cenário em que essas features (as mais preditivas do
@@ -42,17 +53,29 @@ def gerar_lote_sintetico(n: int, concept_drift: bool, seed: int, target_col: str
     coef_debt = 2.2 if not concept_drift else 0.7
     coef_revolv = 2.6 if not concept_drift else 0.8
     logit = (
-        -3.6 + coef_debt * debt_ratio + coef_revolv * revolving_utilization
-        + 0.55 * num_times_30_59 + 0.85 * num_times_60_89 + 1.05 * num_times_90
-        - 0.00002 * monthly_income - 0.01 * age
+        -3.6
+        + coef_debt * debt_ratio
+        + coef_revolv * revolving_utilization
+        + 0.55 * num_times_30_59
+        + 0.85 * num_times_60_89
+        + 1.05 * num_times_90
+        - 0.00002 * monthly_income
+        - 0.01 * age
     )
     target = r.binomial(1, 1 / (1 + np.exp(-logit)))
-    return pd.DataFrame({
-        "age": age, "num_dependents": r.poisson(0.9, n).clip(0, 8), "monthly_income": monthly_income,
-        "debt_ratio": debt_ratio, "revolving_utilization": revolving_utilization,
-        "num_open_credit_lines": num_open_credit_lines, "num_real_estate_loans": r.poisson(1.0, n).clip(0, 6),
-        "num_times_30_59_days_late": num_times_30_59, "num_times_60_89_days_late": num_times_60_89,
-        "num_times_90_days_late": num_times_90,
-        "total_delinquency_events": num_times_30_59 + num_times_60_89 + num_times_90,
-        target_col: target,
-    })
+    return pd.DataFrame(
+        {
+            "age": age,
+            "num_dependents": r.poisson(0.9, n).clip(0, 8),
+            "monthly_income": monthly_income,
+            "debt_ratio": debt_ratio,
+            "revolving_utilization": revolving_utilization,
+            "num_open_credit_lines": num_open_credit_lines,
+            "num_real_estate_loans": r.poisson(1.0, n).clip(0, 6),
+            "num_times_30_59_days_late": num_times_30_59,
+            "num_times_60_89_days_late": num_times_60_89,
+            "num_times_90_days_late": num_times_90,
+            "total_delinquency_events": num_times_30_59 + num_times_60_89 + num_times_90,
+            target_col: target,
+        }
+    )

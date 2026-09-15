@@ -25,8 +25,8 @@ catalog = dbutils.widgets.get("catalog")
 
 # COMMAND ----------
 
-import sys
 import os
+import sys
 
 
 def _find_repo_root(start: str) -> str:
@@ -47,8 +47,9 @@ if repo_root not in sys.path:
 
 # %pip install -r requirements.txt -qqq  (rode manualmente se faltar xgboost/shap)
 
-from src.models import hypothesis_validation as hv
 import matplotlib.pyplot as plt
+
+from src.models import hypothesis_validation as hv
 
 COR_CONFIRMADA = "#2E7D32"
 COR_ALERTA = "#C62828"
@@ -92,12 +93,16 @@ print(f"Conclusão H1: {h1['status']}")
 
 cor_h1 = COR_CONFIRMADA if h1["status"] == "Confirmada" else COR_ALERTA
 fig, ax = plt.subplots(figsize=(8, 5))
-ax.scatter(shap_sample[h1["feature"]], shap_values[:, h1["feature"]].values, alpha=0.35, s=12, color=cor_h1)
+ax.scatter(
+    shap_sample[h1["feature"]], shap_values[:, h1["feature"]].values, alpha=0.35, s=12, color=cor_h1
+)
 ax.axhline(0, color=COR_BASELINE, linewidth=1, linestyle="--")
 ax.set_xlim(-0.05, 2.0)
 ax.set_xlabel(h1["feature"])
 ax.set_ylabel("Valor SHAP (impacto na previsão)")
-ax.set_title(f"H1 — {h1['feature']} vs. SHAP | correlação = {h1['correlacao']:.3f} | {h1['status']}")
+ax.set_title(
+    f"H1 — {h1['feature']} vs. SHAP | correlação = {h1['correlacao']:.3f} | {h1['status']}"
+)
 plt.tight_layout()
 plt.show()
 
@@ -115,13 +120,22 @@ print(f"Conclusão H2: {h2['status']}")
 
 cor_h2 = COR_CONFIRMADA if h2["status"] == "Confirmada" else COR_ALERTA
 fig, ax = plt.subplots(figsize=(6, 5))
-barras = ax.bar([h2["feature_a"], h2["feature_b"]], [h2["shap_a"], h2["shap_b"]], color=[cor_h2, COR_BASELINE])
+barras = ax.bar(
+    [h2["feature_a"], h2["feature_b"]], [h2["shap_a"], h2["shap_b"]], color=[cor_h2, COR_BASELINE]
+)
 for b in barras:
     altura = b.get_height()
-    ax.annotate(f"{altura:.4f}", (b.get_x() + b.get_width() / 2, altura), textcoords="offset points",
-                xytext=(0, 4), ha="center")
+    ax.annotate(
+        f"{altura:.4f}",
+        (b.get_x() + b.get_width() / 2, altura),
+        textcoords="offset points",
+        xytext=(0, 4),
+        ha="center",
+    )
 ax.set_ylabel("Impacto médio no modelo (|SHAP|)")
-ax.set_title(f"H2 — debt_ratio vs age | diferença relativa = {h2['diferenca_relativa']:.1%} | {h2['status']}")
+ax.set_title(
+    f"H2 — debt_ratio vs age | diferença relativa = {h2['diferenca_relativa']:.1%} | {h2['status']}"
+)
 plt.tight_layout()
 plt.show()
 
@@ -133,26 +147,45 @@ plt.show()
 # COMMAND ----------
 
 h3 = hv.validate_h3(models.y_test, models.y_pred_xgb)
-print(f"Baseline (sem filtro): {h3['baseline_default_rate']:.2%} | Piso de aprovação: {h3['min_approval_rate']:.0%}")
+print(
+    f"Baseline (sem filtro): {h3['baseline_default_rate']:.2%} | Piso de aprovação: {h3['min_approval_rate']:.0%}"
+)
 if h3["best_row"] is not None:
     br = h3["best_row"]
-    print(f"Melhor threshold: {br['threshold']} | Aprovação: {br['approval_rate']:.2%} | "
-          f"Inadimplência aprovados: {br['default_rate_approved']:.2%}")
+    print(
+        f"Melhor threshold: {br['threshold']} | Aprovação: {br['approval_rate']:.2%} | "
+        f"Inadimplência aprovados: {br['default_rate_approved']:.2%}"
+    )
 print(f"Conclusão H3: {h3['status']}")
 
 threshold_df = h3["threshold_df"]
 fig, ax1 = plt.subplots(figsize=(9, 5))
-ax1.plot(threshold_df["threshold"], threshold_df["approval_rate"], marker="o", color=COR_NEUTRA, label="Taxa de aprovação")
+ax1.plot(
+    threshold_df["threshold"],
+    threshold_df["approval_rate"],
+    marker="o",
+    color=COR_NEUTRA,
+    label="Taxa de aprovação",
+)
 ax1.axhline(h3["min_approval_rate"], color=COR_BASELINE, linestyle="--", label="Piso de aprovação")
 ax1.set_xlabel("Threshold de probabilidade")
 ax1.set_ylabel("Taxa de aprovação", color=COR_NEUTRA)
 ax2 = ax1.twinx()
-ax2.plot(threshold_df["threshold"], threshold_df["default_rate_approved"], marker="s", color=COR_ALERTA,
-         label="Inadimplência na carteira aprovada")
-ax2.axhline(h3["baseline_default_rate"], color=COR_ALERTA, linestyle=":", label="Baseline sem filtro")
+ax2.plot(
+    threshold_df["threshold"],
+    threshold_df["default_rate_approved"],
+    marker="s",
+    color=COR_ALERTA,
+    label="Inadimplência na carteira aprovada",
+)
+ax2.axhline(
+    h3["baseline_default_rate"], color=COR_ALERTA, linestyle=":", label="Baseline sem filtro"
+)
 ax2.set_ylabel("Inadimplência aprovados", color=COR_ALERTA)
 if h3["best_row"] is not None:
-    ax1.axvline(h3["best_row"]["threshold"], color=COR_CONFIRMADA, linewidth=1.5, label="Melhor threshold")
+    ax1.axvline(
+        h3["best_row"]["threshold"], color=COR_CONFIRMADA, linewidth=1.5, label="Melhor threshold"
+    )
 l1, lb1 = ax1.get_legend_handles_labels()
 l2, lb2 = ax2.get_legend_handles_labels()
 ax1.legend(l1 + l2, lb1 + lb2, loc="center left", fontsize=8)
@@ -175,8 +208,12 @@ plt.show()
 h4 = hv.validate_h4(models.y_test, models.y_pred_xgb, h3)
 if h4["impacto_liquido"] is not None:
     print(f"Threshold usado (herdado de H3): {h4['threshold_usado']}")
-    print(f"Maus pagadores evitados: {h4['maus_pagadores_evitados']} -> Perda evitada: R$ {h4['perda_evitada']:,.2f}")
-    print(f"Bons pagadores rejeitados: {h4['bons_pagadores_rejeitados']} -> Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}")
+    print(
+        f"Maus pagadores evitados: {h4['maus_pagadores_evitados']} -> Perda evitada: R$ {h4['perda_evitada']:,.2f}"
+    )
+    print(
+        f"Bons pagadores rejeitados: {h4['bons_pagadores_rejeitados']} -> Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}"
+    )
     print(f"Impacto financeiro líquido: R$ {h4['impacto_liquido']:,.2f}")
     print(f"Conclusão H4: {h4['status']}")
 
@@ -189,8 +226,14 @@ if h4["impacto_liquido"] is not None:
     ax.axhline(0, color=COR_BASELINE, linewidth=1)
     for b in barras:
         altura = b.get_height()
-        ax.annotate(f"R$ {altura:,.0f}", (b.get_x() + b.get_width() / 2, altura), textcoords="offset points",
-                    xytext=(0, 6 if altura >= 0 else -14), ha="center", fontsize=8)
+        ax.annotate(
+            f"R$ {altura:,.0f}",
+            (b.get_x() + b.get_width() / 2, altura),
+            textcoords="offset points",
+            xytext=(0, 6 if altura >= 0 else -14),
+            ha="center",
+            fontsize=8,
+        )
     ax.set_ylabel("R$ (valores ilustrativos)")
     ax.set_title(f"H4 — Impacto Financeiro Líquido | {h4['status']}")
     plt.tight_layout()

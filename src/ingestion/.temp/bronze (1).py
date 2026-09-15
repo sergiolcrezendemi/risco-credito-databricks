@@ -12,7 +12,10 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.streaming import StreamingQuery
 from pyspark.sql.types import (
-    StructType, StructField, IntegerType, DoubleType,
+    DoubleType,
+    IntegerType,
+    StructField,
+    StructType,
 )
 
 # ------------------------------------------------------------------------------
@@ -20,20 +23,22 @@ from pyspark.sql.types import (
 # Fornecer o schema evita o custo de inferência em streaming (best practice
 # para Auto Loader em ambientes Free Edition / custo controlado).
 # ------------------------------------------------------------------------------
-CREDIT_SCHEMA = StructType([
-    StructField("_c0", IntegerType(), True),
-    StructField("SeriousDlqin2yrs", IntegerType(), True),
-    StructField("RevolvingUtilizationOfUnsecuredLines", DoubleType(), True),
-    StructField("age", IntegerType(), True),
-    StructField("NumberOfTime30-59DaysPastDueNotWorse", IntegerType(), True),
-    StructField("DebtRatio", DoubleType(), True),
-    StructField("MonthlyIncome", DoubleType(), True),
-    StructField("NumberOfOpenCreditLinesAndLoans", IntegerType(), True),
-    StructField("NumberOfTimes90DaysLate", IntegerType(), True),
-    StructField("NumberRealEstateLoansOrLines", IntegerType(), True),
-    StructField("NumberOfTime60-89DaysPastDueNotWorse", IntegerType(), True),
-    StructField("NumberOfDependents", DoubleType(), True),
-])
+CREDIT_SCHEMA = StructType(
+    [
+        StructField("_c0", IntegerType(), True),
+        StructField("SeriousDlqin2yrs", IntegerType(), True),
+        StructField("RevolvingUtilizationOfUnsecuredLines", DoubleType(), True),
+        StructField("age", IntegerType(), True),
+        StructField("NumberOfTime30-59DaysPastDueNotWorse", IntegerType(), True),
+        StructField("DebtRatio", DoubleType(), True),
+        StructField("MonthlyIncome", DoubleType(), True),
+        StructField("NumberOfOpenCreditLinesAndLoans", IntegerType(), True),
+        StructField("NumberOfTimes90DaysLate", IntegerType(), True),
+        StructField("NumberRealEstateLoansOrLines", IntegerType(), True),
+        StructField("NumberOfTime60-89DaysPastDueNotWorse", IntegerType(), True),
+        StructField("NumberOfDependents", DoubleType(), True),
+    ]
+)
 
 
 def ensure_bronze_infra(spark: SparkSession, catalog: str, schema: str = "bronze") -> None:
@@ -55,8 +60,7 @@ def build_bronze_stream(
 ) -> DataFrame:
     """Lê os CSVs de origem via Auto Loader e enriquece com metadados de linhagem."""
     return (
-        spark.readStream
-        .format("cloudFiles")
+        spark.readStream.format("cloudFiles")
         .option("cloudFiles.format", "csv")
         .option("header", "true")
         .schema(CREDIT_SCHEMA)
@@ -77,8 +81,7 @@ def write_bronze_incremental(
     """Escreve o stream Bronze em modo append, com trigger availableNow
     (micro-batch único, seguro e econômico para Free Edition)."""
     return (
-        df_stream.writeStream
-        .format("delta")
+        df_stream.writeStream.format("delta")
         .outputMode("append")
         .option("checkpointLocation", checkpoint_path)
         .trigger(availableNow=True)
@@ -121,6 +124,3 @@ def run_bronze_ingestion(
             f"apague o checkpoint e o schemaLocation e rode novamente."
         )
     print(f"[OK] Ingestão Bronze concluída em {target_table} — {row_count:,} linhas")
-
-
-    

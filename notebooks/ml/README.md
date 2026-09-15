@@ -1,4 +1,4 @@
-    
+
 # notebooks/ml/
 
 Notebooks que dependem de um modelo treinado (XGBoost). Dois tipos aqui,

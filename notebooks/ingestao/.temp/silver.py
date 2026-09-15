@@ -22,11 +22,11 @@
 #     registro para auditoria e não distorce contagens de linhas Bronze→Silver.
 # ==============================================================================
 
+from delta.tables import DeltaTable
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType, IntegerType
 from pyspark.sql.window import Window
-from pyspark.sql.types import IntegerType, DoubleType
-from delta.tables import DeltaTable
 
 # ------------------------------------------------------------------------------
 # Mapeamento único de colunas (snake_case) — ver rationale de consolidação acima
@@ -65,23 +65,27 @@ def clean_silver_schema(df_bronze: DataFrame) -> DataFrame:
     df = rename_columns(df_bronze)
 
     return (
-        df
-        .filter(F.col("customer_id").isNotNull())
+        df.filter(F.col("customer_id").isNotNull())
         # Idade fora da faixa plausível vira null (quarentena), não é descartada
         .withColumn(
             "age",
-            F.when((F.col("age") < MIN_AGE) | (F.col("age") > MAX_AGE), None)
-             .otherwise(F.col("age")),
+            F.when((F.col("age") < MIN_AGE) | (F.col("age") > MAX_AGE), None).otherwise(
+                F.col("age")
+            ),
         )
-        .withColumn("is_monthly_income_null", F.when(F.col("monthly_income").isNull(), 1).otherwise(0))
+        .withColumn(
+            "is_monthly_income_null", F.when(F.col("monthly_income").isNull(), 1).otherwise(0)
+        )
         .withColumn("monthly_income", F.col("monthly_income").cast(DoubleType()))
-        .withColumn("num_dependents", F.coalesce(F.col("num_dependents").cast(IntegerType()), F.lit(0)))
+        .withColumn(
+            "num_dependents", F.coalesce(F.col("num_dependents").cast(IntegerType()), F.lit(0))
+        )
         .withColumn(
             "has_delinquency_outlier",
             F.when(
-                (F.col("num_times_30_59_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD) |
-                (F.col("num_times_60_89_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD) |
-                (F.col("num_times_90_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD),
+                (F.col("num_times_30_59_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD)
+                | (F.col("num_times_60_89_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD)
+                | (F.col("num_times_90_days_late") >= DELINQUENCY_OUTLIER_THRESHOLD),
                 1,
             ).otherwise(0),
         )
@@ -94,8 +98,7 @@ def _dedup_batch(batch_df: DataFrame) -> DataFrame:
     mantendo o mais recente por _ingestion_timestamp."""
     window_spec = Window.partitionBy("customer_id").orderBy(F.col("_ingestion_timestamp").desc())
     return (
-        batch_df
-        .withColumn("_row_num", F.row_number().over(window_spec))
+        batch_df.withColumn("_row_num", F.row_number().over(window_spec))
         .filter(F.col("_row_num") == 1)
         .drop("_row_num")
     )
@@ -163,8 +166,7 @@ def run_silver_ingestion(
         upsert_to_silver(batch_df, batch_id, silver_table)
 
     query_silver = (
-        df_silver_clean.writeStream
-        .format("delta")
+        df_silver_clean.writeStream.format("delta")
         .foreachBatch(_batch_fn)
         .option("checkpointLocation", checkpoint_path)
         .trigger(availableNow=True)

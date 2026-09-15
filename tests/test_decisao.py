@@ -1,6 +1,7 @@
 """
 Testes para src/risco_credito/ml/decisao.py
 """
+
 import pytest
 
 from src.ml.decisao import classificar_decisao

@@ -1,7 +1,7 @@
 """
 Testes para src/risco_credito/monitoring/concept_drift.py
 """
-import numpy as np
+
 import pytest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
@@ -44,7 +44,9 @@ def test_gerar_lote_sintetico_reprodutivel_com_mesma_seed():
     df1 = gerar_lote_sintetico(n=200, concept_drift=False, seed=7)
     df2 = gerar_lote_sintetico(n=200, concept_drift=False, seed=7)
     pd_testing_equal = (df1.to_numpy() == df2.to_numpy()).all()
-    assert pd_testing_equal, "mesma seed deve gerar o mesmo lote (essencial pro SIMULATION_MODE ser comparável)"
+    assert (
+        pd_testing_equal
+    ), "mesma seed deve gerar o mesmo lote (essencial pro SIMULATION_MODE ser comparável)"
 
 
 def test_gerar_lote_sintetico_sem_nans():
@@ -70,4 +72,6 @@ def test_concept_drift_reduz_auc_de_um_modelo_treinado_sem_drift():
     )
 
     resultado = avaliar_queda_auc(auc_referencia, auc_drift, limiar=0.03)
-    assert resultado["queda_auc"] > 0, "modelo treinado sem drift deve performar pior no lote com drift"
+    assert (
+        resultado["queda_auc"] > 0
+    ), "modelo treinado sem drift deve performar pior no lote com drift"

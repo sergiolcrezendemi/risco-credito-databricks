@@ -11,4 +11,4 @@ github= https://github.com/sergiolcrezendemi/risco-credito-databricks
 ## FLUXO
 - 1- executar a job: job_ingestao
         notebook\[...] ->  src\[...]
-- 2- 
+- 2-

@@ -27,12 +27,12 @@ from mlflow.models.signature import infer_signature
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import train_test_split
 
-from src.models.hypothesis_validation import TARGET_COL
 from src.config.business_params import (
     CUSTO_APROVAR_MAU_PAGADOR,
     CUSTO_NEGAR_BOM_PAGADOR,
     VALOR_MEDIO_OPERACAO,
 )
+from src.models.hypothesis_validation import TARGET_COL
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 
@@ -50,8 +50,15 @@ def prepare_train_test(df: pd.DataFrame, test_size: float = 0.25, seed: int = 42
 
 
 def load_or_train_model(
-    spark, catalog: str, schema: str, model_name: str, model_alias: str,
-    X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series,
+    spark,
+    catalog: str,
+    schema: str,
+    model_name: str,
+    model_alias: str,
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
     seed: int = 42,
 ):
     """Carrega do Model Registry (Unity Catalog); se o alias ainda não existir,
@@ -64,12 +71,18 @@ def load_or_train_model(
         print(f"Modelo carregado do Registry: models:/{full_model_name}@{model_alias}")
         return model
     except Exception:
-        print(f"Alias '@{model_alias}' ainda não existe para '{full_model_name}'. Treinando baseline...")
+        print(
+            f"Alias '@{model_alias}' ainda não existe para '{full_model_name}'. Treinando baseline..."
+        )
 
     with mlflow.start_run(run_name="baseline_xgb_validacao"):
         model = xgb.XGBClassifier(
-            n_estimators=300, max_depth=4, learning_rate=0.05,
-            subsample=0.8, colsample_bytree=0.8, eval_metric="auc",
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            eval_metric="auc",
             scale_pos_weight=(y_train == 0).sum() / (y_train == 1).sum(),
             random_state=seed,
         )
@@ -79,8 +92,11 @@ def load_or_train_model(
 
         signature = infer_signature(X_train, model.predict_proba(X_train)[:, 1])
         mlflow.xgboost.log_model(
-            model, "model", registered_model_name=full_model_name,
-            signature=signature, input_example=X_train.head(5),
+            model,
+            "model",
+            registered_model_name=full_model_name,
+            signature=signature,
+            input_example=X_train.head(5),
         )
         print(f"AUC baseline no teste: {auc:.4f}")
 
@@ -88,7 +104,9 @@ def load_or_train_model(
             client = mlflow.MlflowClient()
             versoes = client.search_model_versions(f"name='{full_model_name}'")
             ultima_versao = max(int(v.version) for v in versoes)
-            client.set_registered_model_alias(name=full_model_name, alias=model_alias, version=ultima_versao)
+            client.set_registered_model_alias(
+                name=full_model_name, alias=model_alias, version=ultima_versao
+            )
             print(f"Alias '@{model_alias}' apontado para a versão {ultima_versao}.")
         except Exception as e:
             print(f"[AVISO] Não foi possível setar o alias automaticamente: {e}")
@@ -117,7 +135,8 @@ def check_top_n(features_esperadas: list, top_features: set, top_n: int = 5) -> 
 
 
 def optimize_threshold_asymmetric(
-    y_test: pd.Series, y_proba_test: np.ndarray,
+    y_test: pd.Series,
+    y_proba_test: np.ndarray,
     custo_negar_bom: float = CUSTO_NEGAR_BOM_PAGADOR,
     custo_aprovar_mau: float = CUSTO_APROVAR_MAU_PAGADOR,
 ) -> dict:
@@ -129,7 +148,9 @@ def optimize_threshold_asymmetric(
         y_pred = (y_proba_test >= t).astype(int)
         tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
         custo_total = fp * custo_negar_bom + fn * custo_aprovar_mau
-        rows.append({"threshold": t, "fp": fp, "fn": fn, "tp": tp, "tn": tn, "custo_total": custo_total})
+        rows.append(
+            {"threshold": t, "fp": fp, "fn": fn, "tp": tp, "tn": tn, "custo_total": custo_total}
+        )
 
     df_custos = pd.DataFrame(rows)
     melhor = df_custos.loc[df_custos["custo_total"].idxmin()]
@@ -153,12 +174,21 @@ def _metricas_por_grupo(df_val: pd.DataFrame, coluna_grupo: str) -> pd.DataFrame
         fpr = fp / (fp + tn) if (fp + tn) > 0 else np.nan
         fnr = fn / (fn + tp) if (fn + tp) > 0 else np.nan
         acc = (tp + tn) / len(sub) if len(sub) > 0 else np.nan
-        linhas.append({"grupo": grupo, "n": len(sub), "acuracia": acc,
-                        "fpr_bons_negados": fpr, "fnr_maus_aprovados": fnr})
+        linhas.append(
+            {
+                "grupo": grupo,
+                "n": len(sub),
+                "acuracia": acc,
+                "fpr_bons_negados": fpr,
+                "fnr_maus_aprovados": fnr,
+            }
+        )
     return pd.DataFrame(linhas)
 
 
-def bias_analysis(X_test: pd.DataFrame, y_test: pd.Series, y_proba_test: np.ndarray, threshold: float) -> dict:
+def bias_analysis(
+    X_test: pd.DataFrame, y_test: pd.Series, y_proba_test: np.ndarray, threshold: float
+) -> dict:
     """Q3 — performance por faixa de idade e de renda, com flag de
     desproporcionalidade (métrica do grupo > média + 1 desvio-padrão)."""
     df_val = X_test.copy()
@@ -167,7 +197,8 @@ def bias_analysis(X_test: pd.DataFrame, y_test: pd.Series, y_proba_test: np.ndar
     df_val["y_pred"] = (df_val["y_proba"] >= threshold).astype(int)
 
     df_val["faixa_idade"] = pd.cut(
-        df_val["age"], bins=[18, 30, 40, 50, 60, 100],
+        df_val["age"],
+        bins=[18, 30, 40, 50, 60, 100],
         labels=["18-30", "31-40", "41-50", "51-60", "60+"],
     )
 
@@ -192,11 +223,16 @@ def bias_analysis(X_test: pd.DataFrame, y_test: pd.Series, y_proba_test: np.ndar
             media, desvio = tabela[metrica].mean(), tabela[metrica].std()
             outliers = tabela[tabela[metrica] > media + desvio]
             for _, row in outliers.iterrows():
-                alertas.append(f"[{nome}] grupo {row['grupo']}: {metrica} = {row[metrica]:.2%} (desproporcional)")
+                alertas.append(
+                    f"[{nome}] grupo {row['grupo']}: {metrica} = {row[metrica]:.2%} (desproporcional)"
+                )
 
     return {
-        "tabela_idade": tabela_idade, "tabela_renda": tabela_renda,
-        "alertas": alertas, "aviso_renda": aviso_renda, "df_val": df_val,
+        "tabela_idade": tabela_idade,
+        "tabela_renda": tabela_renda,
+        "alertas": alertas,
+        "aviso_renda": aviso_renda,
+        "df_val": df_val,
     }
 
 
@@ -227,15 +263,25 @@ def financial_impact(
     impacto_liquido = reducao_bruta - custo_oportunidade
 
     return {
-        "n_operacoes": n_operacoes, "taxa_sem_modelo": taxa_sem_modelo, "perda_sem_modelo": perda_sem_modelo,
-        "taxa_com_modelo": taxa_com_modelo, "perda_com_modelo": perda_com_modelo,
-        "reducao_bruta": reducao_bruta, "custo_oportunidade": custo_oportunidade,
+        "n_operacoes": n_operacoes,
+        "taxa_sem_modelo": taxa_sem_modelo,
+        "perda_sem_modelo": perda_sem_modelo,
+        "taxa_com_modelo": taxa_com_modelo,
+        "perda_com_modelo": perda_com_modelo,
+        "reducao_bruta": reducao_bruta,
+        "custo_oportunidade": custo_oportunidade,
         "impacto_liquido": impacto_liquido,
     }
 
 
-def log_validation_to_mlflow(threshold_result: dict, financial_result: dict, ranking_shap: pd.DataFrame,
-                              bias_result: dict, status_h1: str, status_h2: str) -> None:
+def log_validation_to_mlflow(
+    threshold_result: dict,
+    financial_result: dict,
+    ranking_shap: pd.DataFrame,
+    bias_result: dict,
+    status_h1: str,
+    status_h2: str,
+) -> None:
     with mlflow.start_run(run_name="validacao_shap_threshold_vies_roi"):
         mlflow.log_param("threshold_otimo", threshold_result["threshold_otimo"])
         mlflow.log_param("custo_aprovar_mau_pagador", CUSTO_APROVAR_MAU_PAGADOR)
@@ -245,8 +291,12 @@ def log_validation_to_mlflow(threshold_result: dict, financial_result: dict, ran
         mlflow.log_metric("taxa_inadimplencia_sem_modelo", financial_result["taxa_sem_modelo"])
         mlflow.log_metric("taxa_inadimplencia_com_modelo", financial_result["taxa_com_modelo"])
         mlflow.log_dict(ranking_shap.to_dict(orient="records"), "shap_ranking.json")
-        mlflow.log_dict(bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json")
-        mlflow.log_dict(bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json")
+        mlflow.log_dict(
+            bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json"
+        )
+        mlflow.log_dict(
+            bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json"
+        )
         mlflow.log_param("h1_status", status_h1)
         mlflow.log_param("h2_status", status_h2)
     print("\nValidação concluída e registrada no MLflow.")

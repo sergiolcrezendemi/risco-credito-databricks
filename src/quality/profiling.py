@@ -9,7 +9,7 @@
 # só chamam `run_profile`.
 # ==============================================================================
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 
@@ -20,20 +20,28 @@ def null_completeness_report(df: DataFrame) -> DataFrame:
     counts = df.agg(*exprs).collect()[0].asDict()
 
     rows = [
-        (col_name, dict(df.dtypes)[col_name], missing, round((missing / total) * 100, 2) if total else 0.0)
+        (
+            col_name,
+            dict(df.dtypes)[col_name],
+            missing,
+            round((missing / total) * 100, 2) if total else 0.0,
+        )
         for col_name, missing in counts.items()
     ]
-    return (
-        df.sparkSession.createDataFrame(rows, ["coluna", "tipo_dado", "qtd_nulos_ou_vazios", "pct_nulos"])
-        .orderBy(F.desc("qtd_nulos_ou_vazios"))
-    )
+    return df.sparkSession.createDataFrame(
+        rows, ["coluna", "tipo_dado", "qtd_nulos_ou_vazios", "pct_nulos"]
+    ).orderBy(F.desc("qtd_nulos_ou_vazios"))
 
 
 def duplicate_report(df: DataFrame, key_cols: list) -> None:
     """Imprime duplicidade exata de linha e duplicidade por chave de negócio."""
     total = df.count()
     exact_dupes = total - df.dropDuplicates().count()
-    print(f"Linhas 100% idênticas duplicadas: {exact_dupes:,} ({exact_dupes / total:.2%})" if total else "Tabela vazia.")
+    print(
+        f"Linhas 100% idênticas duplicadas: {exact_dupes:,} ({exact_dupes / total:.2%})"
+        if total
+        else "Tabela vazia."
+    )
 
     if key_cols:
         key_counts = df.groupBy(*key_cols).count().filter(F.col("count") > 1)
@@ -55,16 +63,17 @@ def cardinality_report(df: DataFrame) -> DataFrame:
         (col_name, distinct_count, round((distinct_count / total) * 100, 2) if total else 0.0)
         for col_name, distinct_count in distincts.items()
     ]
-    return (
-        df.sparkSession.createDataFrame(rows, ["coluna", "valores_distintos_aprox", "pct_distintos"])
-        .orderBy("valores_distintos_aprox")
-    )
+    return df.sparkSession.createDataFrame(
+        rows, ["coluna", "valores_distintos_aprox", "pct_distintos"]
+    ).orderBy("valores_distintos_aprox")
 
 
 def numeric_summary(df: DataFrame, numeric_cols: list) -> DataFrame:
     """Estatísticas descritivas (min/percentis/max) das colunas numéricas informadas."""
     cols_presentes = [c for c in numeric_cols if c in df.columns]
-    return df.select(cols_presentes).summary("count", "mean", "stddev", "min", "25%", "50%", "75%", "max")
+    return df.select(cols_presentes).summary(
+        "count", "mean", "stddev", "min", "25%", "50%", "75%", "max"
+    )
 
 
 def run_profile(

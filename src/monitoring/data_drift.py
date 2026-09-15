@@ -5,6 +5,7 @@ Puro numpy — sem dependência de spark ou dbutils — para rodar em pytest
 sem precisar de um cluster Databricks. Usado por
 notebooks/monitoracao/01_drift_dados.py.
 """
+
 import numpy as np
 
 

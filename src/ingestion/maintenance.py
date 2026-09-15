@@ -66,15 +66,21 @@ def reset_legacy_environment(
     print(f"  [removido se existia] {silver_table}")
 
     # 2. Checkpoints e schemaLocation legados (Volumes)
-    print(_rm_if_exists(
-        dbutils, f"/Volumes/{catalog}/{bronze_schema}/checkpoints/{LEGACY_BRONZE_CHECKPOINT}/"
-    ))
-    print(_rm_if_exists(
-        dbutils, f"/Volumes/{catalog}/{bronze_schema}/schemas/{LEGACY_BRONZE_SCHEMA_LOC}/"
-    ))
-    print(_rm_if_exists(
-        dbutils, f"/Volumes/{catalog}/{silver_schema}/checkpoints/{LEGACY_SILVER_CHECKPOINT}/"
-    ))
+    print(
+        _rm_if_exists(
+            dbutils, f"/Volumes/{catalog}/{bronze_schema}/checkpoints/{LEGACY_BRONZE_CHECKPOINT}/"
+        )
+    )
+    print(
+        _rm_if_exists(
+            dbutils, f"/Volumes/{catalog}/{bronze_schema}/schemas/{LEGACY_BRONZE_SCHEMA_LOC}/"
+        )
+    )
+    print(
+        _rm_if_exists(
+            dbutils, f"/Volumes/{catalog}/{silver_schema}/checkpoints/{LEGACY_SILVER_CHECKPOINT}/"
+        )
+    )
 
     print(
         "[OK] Reset concluído. Agora rode 01_bronze.py com dataset=training "

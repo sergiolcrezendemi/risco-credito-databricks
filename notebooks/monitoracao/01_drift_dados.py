@@ -25,10 +25,11 @@
 # 0. CONFIGURAÇÃO
 # =========================
 import logging
+from datetime import datetime, timezone
+
+import mlflow
 import numpy as np
 import pandas as pd
-import mlflow
-from datetime import datetime, timezone
 from scipy.stats import ks_2samp
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
@@ -44,9 +45,17 @@ OUTPUT_TABLE = f"{CATALOG}.ml.monitoramento_drift_dados"
 MONITORING_EXPERIMENT = "/Shared/credito_risco_monitoramento"
 
 FEATURE_COLS = [
-    "age", "num_dependents", "monthly_income", "debt_ratio", "revolving_utilization",
-    "num_open_credit_lines", "num_real_estate_loans", "num_times_30_59_days_late",
-    "num_times_60_89_days_late", "num_times_90_days_late", "total_delinquency_events",
+    "age",
+    "num_dependents",
+    "monthly_income",
+    "debt_ratio",
+    "revolving_utilization",
+    "num_open_credit_lines",
+    "num_real_estate_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "total_delinquency_events",
 ]
 
 PSI_MODERADO = 0.10
@@ -58,8 +67,8 @@ mlflow.set_experiment(MONITORING_EXPERIMENT)
 # =========================
 # 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_data_drift.py
 # =========================
-import sys
 import os
+import sys
 
 
 def _find_repo_root(start: str) -> str:
@@ -80,6 +89,7 @@ if repo_root not in sys.path:
 
 from src.monitoring.data_drift import calcular_psi, classificar_psi
 
+
 # COMMAND ----------
 # =========================
 # 1. CARREGA REFERÊNCIA (treino) E LOTE ATUAL (scoring)
@@ -96,6 +106,7 @@ def carregar(where_target_nulo: bool) -> pd.DataFrame:
     """)
     return df_spark.toPandas()
 
+
 df_referencia = carregar(where_target_nulo=False)
 df_atual = carregar(where_target_nulo=True)
 
@@ -105,7 +116,9 @@ if df_referencia.empty or df_atual.empty:
         f"vazios — nada a comparar. Rode 03_inferencia_batch.py primeiro se o lote atual estiver vazio."
     )
 
-print(f"Referência (treino): {len(df_referencia)} linhas | Lote atual (scoring): {len(df_atual)} linhas")
+print(
+    f"Referência (treino): {len(df_referencia)} linhas | Lote atual (scoring): {len(df_atual)} linhas"
+)
 
 # COMMAND ----------
 # =========================
@@ -124,13 +137,20 @@ for feature in FEATURE_COLS:
     ref_validos = ref_vals[~np.isnan(ref_vals)]
     atual_validos = atual_vals[~np.isnan(atual_vals)]
     ks_stat, ks_pvalue = (
-        ks_2samp(ref_validos, atual_validos) if len(ref_validos) and len(atual_validos) else (float("nan"), float("nan"))
+        ks_2samp(ref_validos, atual_validos)
+        if len(ref_validos) and len(atual_validos)
+        else (float("nan"), float("nan"))
     )
 
-    linhas_resultado.append({
-        "feature": feature, "psi": psi, "classificacao_psi": classificacao,
-        "ks_statistic": float(ks_stat), "ks_pvalue": float(ks_pvalue),
-    })
+    linhas_resultado.append(
+        {
+            "feature": feature,
+            "psi": psi,
+            "classificacao_psi": classificacao,
+            "ks_statistic": float(ks_stat),
+            "ks_pvalue": float(ks_pvalue),
+        }
+    )
     if classificacao == "SEVERO":
         alertas_severos.append(feature)
 

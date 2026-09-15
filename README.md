@@ -76,7 +76,7 @@ Testada por: comparação entre perda evitada (maus pagadores rejeitados × cust
 Em andamento — ingestão Bronze já implementada (`01_ingestao_bronze_autoloader.py`), seguindo roadmap de 9 fases.
 
 
---- 
+---
 * JUSTIFICATIVA PARA O LEVANTAMENTO DAS HIPOTESES
 
 # Por que essas 4 hipóteses — e o que elas entregam para a decisão
@@ -229,6 +229,3 @@ Esse é o número-chave para o pitch de negócio: mesmo descontando o custo de e
 ---
 
 **Resumo em uma frase:** o modelo funciona bem e é lucrativo, mas antes de ir para produção vale endereçar o viés contra jovens (Q3) e revisar por que a faixa de renda alta tem tanto mau pagador escapando (Q3), possivelmente recalibrando threshold por segmento em vez de um único corte global.
-
-
-
