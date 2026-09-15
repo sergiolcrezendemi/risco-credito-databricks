@@ -8,4 +8,5 @@ data/processed/
 .databrickscfg
 .env
 *.pem
+.temp_del*/
 
