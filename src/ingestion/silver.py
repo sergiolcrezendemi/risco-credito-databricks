@@ -172,4 +172,19 @@ def run_silver_ingestion(
     )
     query_silver.awaitTermination()
 
-    print(f"[OK] Carga Silver concluída em {silver_table}")
+    # 5. Validação de sanidade pós-carga — sem isto, uma retry em que o
+    #    checkpoint já marcou toda a Bronze como consumida executa ZERO
+    #    microbatches (foreachBatch nunca roda, tabela nunca é criada) e
+    #    ainda assim o awaitTermination() retorna sem exceção, mascarando
+    #    a falha até o notebook seguinte estourar TABLE_OR_VIEW_NOT_FOUND.
+    if not spark.catalog.tableExists(silver_table):
+        raise RuntimeError(
+            f"[FALHA] {silver_table} não foi criada após a ingestão. "
+            f"Causa provável: o checkpoint em {checkpoint_path} já havia "
+            f"consumido toda a Bronze disponível em uma execução anterior "
+            f"(retry sem novo dado gera 0 microbatches). Apague o checkpoint "
+            f"e rode novamente para reprocessar a Bronze desde o início."
+        )
+
+    row_count = spark.table(silver_table).count()
+    print(f"[OK] Carga Silver concluída em {silver_table} — {row_count:,} linhas")
