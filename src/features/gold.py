@@ -68,6 +68,7 @@ FCT_RENAME_MAP = {
 }
 
 
+
 def _read_silver_combined(
     spark: SparkSession,
     catalog: str,
@@ -75,12 +76,7 @@ def _read_silver_combined(
     training_table_name: str,
     scoring_table_name: str,
 ) -> DataFrame:
-    """Lê a Silver de treino e, se existir, une a de scoring — que não tem
-    `target_default_2yrs` (o CSV de scoring não traz `SeriousDlqin2yrs`), daí
-    entrar com esse valor nulo, no mesmo tipo da coluna de treino, antes do
-    UNION. Falha alto (não segue silenciosamente) se qualquer OUTRA coluna
-    divergir do esperado — schema divergente inesperado é bug de upstream
-    (Silver), não algo pra Gold tentar adivinhar como conciliar."""
+    """..."""
     training_table = f"{catalog}.{silver_schema}.{training_table_name}"
     scoring_table = f"{catalog}.{silver_schema}.{scoring_table_name}"
 
@@ -94,6 +90,8 @@ def _read_silver_combined(
             f"(sem lote de scoring para inferência/monitoramento)."
         )
         return df_training
+
+    df_scoring = spark.table(scoring_table)
 
     if "target_default_2yrs" not in df_scoring.columns:
         target_dtype = dict(df_training.dtypes)["target_default_2yrs"]
@@ -111,6 +109,7 @@ def _read_silver_combined(
         )
 
     return df_training.unionByName(df_scoring)
+
 
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:

@@ -1,0 +1,14 @@
+Para criar a automação com as melhores práticas, siga estes passos diretamente na tela onde você está:
+
+Olhe para o menu lateral esquerdo da sua tela (o menu escuro).
+
+Clique na opção Jobs & Pipelines (logo abaixo de Catalog).
+
+No painel superior direito, clique em Create Job.
+
+Crie a sua primeira "Task" selecionando o seu notebook 01_bronze.
+
+Adicione uma nova "Task" selecionando o notebook 02_silver e configure a opção Depends on (Depende de) para a task da Bronze.
+
+Faça o mesmo para a 03_gold, colocando-a como dependente da Silver.
+
