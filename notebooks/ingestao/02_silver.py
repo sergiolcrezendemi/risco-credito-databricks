@@ -4,7 +4,7 @@
 # environment_version = "5"
 # ///
 # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-# MAGIC %sh uv sync
+%sh uv sync
 
 # COMMAND ----------
 
