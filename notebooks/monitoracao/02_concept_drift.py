@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # =============================================================================
 # notebooks/monitoracao/02_concept_drift.py
 # -----------------------------------------------------------------------------
@@ -25,6 +29,7 @@
 # =============================================================================
 
 # COMMAND ----------
+
 # =========================
 # 0. CONFIGURAÇÃO
 # =========================
@@ -78,6 +83,7 @@ N_SIMULADO = 20_000
 mlflow.set_experiment(MONITORING_EXPERIMENT)
 
 # COMMAND ----------
+
 # =========================
 # 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_concept_drift.py
 # =========================
@@ -104,6 +110,7 @@ if repo_root not in sys.path:
 from src.monitoring.concept_drift import avaliar_queda_auc, gerar_lote_sintetico
 
 # COMMAND ----------
+
 # =========================
 # 1. CARREGA O @champion
 # =========================
@@ -113,6 +120,7 @@ modelo = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@champion")
 print(f"Champion carregado: {MODEL_NAME} versão {versao_champion.version}")
 
 # COMMAND ----------
+
 # =========================
 # 1B. TENTA MODO REAL — cai para simulação se a tabela de rótulos não existir
 # =========================
@@ -143,6 +151,7 @@ if not SIMULATION_MODE:
         SIMULATION_MODE = True
 
 # COMMAND ----------
+
 # =========================
 # 2. REFERÊNCIA E LOTE — depende do modo (gerar_lote_sintetico vem de src/)
 # =========================
@@ -161,6 +170,7 @@ if SIMULATION_MODE:
     )
 
 # COMMAND ----------
+
 # =========================
 # 3. AVALIA O LOTE ATUAL CONTRA A REFERÊNCIA
 # =========================
@@ -191,6 +201,7 @@ else:
     )
 
 # COMMAND ----------
+
 # =========================
 # 4. LOGA NO MLFLOW E PERSISTE HISTÓRICO
 # =========================
