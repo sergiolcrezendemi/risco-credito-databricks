@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # =============================================================================
 # notebooks/monitoracao/01_drift_dados.py
 # -----------------------------------------------------------------------------
@@ -21,6 +25,7 @@
 # =============================================================================
 
 # COMMAND ----------
+
 # =========================
 # 0. CONFIGURAÇÃO
 # =========================
@@ -64,6 +69,7 @@ PSI_SEVERO = 0.25
 mlflow.set_experiment(MONITORING_EXPERIMENT)
 
 # COMMAND ----------
+
 # =========================
 # 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_data_drift.py
 # =========================
@@ -91,6 +97,7 @@ from src.monitoring.data_drift import calcular_psi, classificar_psi
 
 
 # COMMAND ----------
+
 # =========================
 # 1. CARREGA REFERÊNCIA (treino) E LOTE ATUAL (scoring)
 # =========================
@@ -121,6 +128,7 @@ print(
 )
 
 # COMMAND ----------
+
 # =========================
 # 3. CALCULA PSI + KS PARA CADA FEATURE
 # =========================
@@ -164,6 +172,7 @@ else:
     print("\nNenhuma feature com drift severo neste lote.")
 
 # COMMAND ----------
+
 # =========================
 # 4. LOGA NO MLFLOW E PERSISTE HISTÓRICO
 # =========================

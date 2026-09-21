@@ -1,24 +1,35 @@
 # Databricks notebook source
 # /// script
 # [tool.databricks.environment]
+# base_environment = "databricks_ai_v5"
 # environment_version = "5"
+# dependencies = [
+#   " shap>=0.44",
+#   " xgboost>=2.0",
+# ]
 # ///
 # MAGIC %%sh
 # MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# MAGIC # uv sync faz o sincronismo no pyproject.toml da raiz do repo
+# MAGIC
 # MAGIC uv sync
 
 # COMMAND ----------
 
-# ==============================================================================
-# notebooks/ml/01_hipoteses_h1_h4.py
-# Validação das hipóteses H1-H4 (ver README.md) — treino, SHAP e teste de
-# cada hipótese vivem em src/models/hypothesis_validation.py. Este notebook
-# só orquestra e plota; nenhuma lógica de negócio deve ser adicionada aqui.
-#
-# Complementar a este: notebooks/ml/02_vies_threshold_roi.py (perguntas
-# Q2/Q3 do README — threshold com custo assimétrico e checagem de viés por
-# idade/renda), que já lê da mesma Gold.
-# ==============================================================================
+# MAGIC %md
+# MAGIC ```
+# MAGIC  ==============================================================================
+# MAGIC  notebooks/ml/01_hipoteses_h1_h4.py
+# MAGIC  Validação das hipóteses H1-H4 (ver README.md) — treino, SHAP e teste de
+# MAGIC  cada hipótese vivem em src/models/hypothesis_validation.py. Este notebook
+# MAGIC  só orquestra e plota; nenhuma lógica de negócio deve ser adicionada aqui.
+# MAGIC
+# MAGIC  Complementar a este: notebooks/ml/02_vies_threshold_roi.py (perguntas
+# MAGIC  Q2/Q3 do README — threshold com custo assimétrico e hecagem de viés por
+# MAGIC  idade/renda), que já lê da mesma Gold.
+# MAGIC  ==============================================================================
+# MAGIC
+# MAGIC  ```
 
 # COMMAND ----------
 

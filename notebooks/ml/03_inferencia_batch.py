@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # =============================================================================
 # notebooks/ml/03_inferencia_batch.py
 # -----------------------------------------------------------------------------
@@ -21,6 +25,7 @@
 # =============================================================================
 
 # COMMAND ----------
+
 # =========================
 # 0. CONFIGURAÇÃO
 # =========================
@@ -64,6 +69,7 @@ FEATURE_COLS = [
 ]
 
 # COMMAND ----------
+
 # =========================
 # 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_decisao.py
 # =========================
@@ -90,6 +96,7 @@ if repo_root not in sys.path:
 from src.ml.decisao import classificar_decisao
 
 # COMMAND ----------
+
 # =========================
 # 1. CARREGA O MODELO @champion
 # =========================
@@ -110,6 +117,7 @@ except Exception as e:
 # sempre a probabilidade da classe positiva, sem ambiguidade.
 
 # COMMAND ----------
+
 # =========================
 # 2. CARREGA O LOTE NOVO (dataset scoring — TARGET_COL nulo)
 # =========================
@@ -142,6 +150,7 @@ if not nulos_por_coluna.empty:
         print(f"  {col}: {qtd} ({qtd / len(df):.2%})")
 
 # COMMAND ----------
+
 # =========================
 # 3. SCORING
 # =========================
@@ -165,6 +174,7 @@ print(f"Taxa de negação neste lote: {taxa_negacao:.2%}")
 print(df_resultado["probabilidade_inadimplencia"].describe())
 
 # COMMAND ----------
+
 # =========================
 # 4. PERSISTE O RESULTADO (append — cada execução soma um novo lote com seu timestamp)
 # =========================
