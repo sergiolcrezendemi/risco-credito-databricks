@@ -1,18 +1,34 @@
-# src/models/bias_roi_validation.py 
+# src/models/bias_roi_validation.py
 # ==============================================================================
 # PERGUNTAS Q1-Q4 DO README (distintas das hipóteses H1-H4 — ver
 # src/models/hypothesis_validation.py para essas):
-#   Q1 - Ranking de importância via SHAP (checagem rápida: H1/H2 aparecem no top-5?)
-#   Q2 - Threshold ótimo sob CUSTO ASSIMÉTRICO (não só piso de aprovação)
-#   Q3 - Estabilidade/viés do modelo por faixa de idade e renda
-#   Q4 - Impacto financeiro estimado (R$) vs. política atual
+#   Q1 - Ranking de importância via SHAP
+#   Q2 - Threshold de custo mínimo (custo assimétrico) vs. threshold operacional
+#   Q3 - Viés por faixa de idade e renda, no THRESHOLD OPERACIONAL
+#   Q3b - Calibração das probabilidades (pré-requisito para precificar)
+#   Q3c - XGBoost vs. regressão logística na MESMA taxa de aprovação
+#   Q4 - Impacto financeiro estimado (R$) no threshold operacional
 #
-# Os parâmetros financeiros vêm de src/config/business_params.py — mesma
-# fonte usada por H4 em hypothesis_validation.py, para as duas contas nunca
-# mais divergirem por constantes diferentes escritas em dois lugares. H4 e
-# Q4 ainda podem dar números diferentes mesmo assim: H4 usa o threshold de
-# H3 (piso de aprovação), Q4 usa o threshold de Q2 (custo mínimo) — isso é
-# intencional, respondem perguntas diferentes.
+# DECISÕES DESTA VERSÃO
+#   - Threshold operacional único (0,45, definido em H3 pelo piso de
+#     aprovação) para viés e impacto financeiro. O threshold de custo mínimo
+#     (Q2) é mostrado como comparação, não como régua de decisão: medir viés
+#     numa régua que não seria usada responde a uma pergunta que ninguém fez.
+#   - Features explícitas (FEATURE_COLS): qualquer coluna nova na Gold (ex.:
+#     `_gold_processed_at`) não vira feature por acidente.
+#   - O notebook só CARREGA o @champion. A versão anterior treinava e
+#     promovia um modelo novo a @champion se o carregamento falhasse por
+#     qualquer motivo — um erro transitório de rede podia trocar o modelo
+#     de produção em silêncio.
+#   - Renda não informada (~20% da base) vira faixa própria. Antes era
+#     preenchida com 0 e caía na faixa de menor renda, misturando dois
+#     grupos diferentes na análise de viés.
+#   - Critério de viés: métricas reconhecidas de fairness (razão de taxa de
+#     aprovação — regra dos 4/5 — e taxa de bons pagadores negados com
+#     intervalo de confiança) no lugar de "média + 1 desvio-padrão", que
+#     com 5 grupos dispara quase sempre, por acaso.
+#   - Removidas as checagens H1/H2 de top-5: usavam definições antigas das
+#     hipóteses, diferentes das de hypothesis_validation.py.
 # ==============================================================================
 
 import logging
@@ -22,98 +38,83 @@ import mlflow.xgboost
 import numpy as np
 import pandas as pd
 import shap
-import xgboost as xgb
-from mlflow.models.signature import infer_signature
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.calibration import calibration_curve
+from sklearn.impute import SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import brier_score_loss, confusion_matrix, roc_auc_score
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from src.config.business_params import (
     CUSTO_APROVAR_MAU_PAGADOR,
     CUSTO_NEGAR_BOM_PAGADOR,
-    VALOR_MEDIO_OPERACAO,
 )
 from src.models.hypothesis_validation import TARGET_COL
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 
-H1_FEATURES = ["num_times_30_59_days_late", "num_times_90_days_late"]
-H2_FEATURES = ["revolving_utilization", "monthly_income"]
+FEATURE_COLS = [
+    "age",
+    "num_dependents",
+    "monthly_income",
+    "debt_ratio",
+    "revolving_utilization",
+    "num_open_credit_lines",
+    "num_real_estate_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "total_delinquency_events",
+]
+
+# Critérios de viés (pontos de partida documentados — calibrar com risco/jurídico)
+LIMIAR_RAZAO_APROVACAO = 0.80  # regra dos 4/5
+MIN_BONS_POR_GRUPO = 100  # abaixo disso, a taxa de bons negados é instável demais
+Z_95 = 1.96
 
 
+# ------------------------------------------------------------------------------
+# Dados e modelo
+# ------------------------------------------------------------------------------
 def prepare_train_test(df: pd.DataFrame, test_size: float = 0.25, seed: int = 42):
+    """Filtra linhas rotuladas (a Gold também contém o lote de scoring, com
+    alvo nulo) e separa treino/teste com as features explícitas.
+
+    ATENÇÃO: test_size, seed e a estratificação precisam ser os mesmos do
+    notebook de treino do @champion; senão o 'teste' contém clientes que o
+    modelo viu no treino e as métricas saem otimistas.
+    """
+    faltando = [c for c in FEATURE_COLS + [TARGET_COL] if c not in df.columns]
+    if faltando:
+        raise ValueError(f"Colunas ausentes nos dados de entrada: {faltando}")
+
     df = df.dropna(subset=[TARGET_COL]).copy()
     df[TARGET_COL] = df[TARGET_COL].astype(int)
-
-    feature_cols = [c for c in df.columns if c not in ["customer_id", TARGET_COL]]
-    X, y = df[feature_cols], df[TARGET_COL]
+    X, y = df[FEATURE_COLS], df[TARGET_COL]
     return train_test_split(X, y, test_size=test_size, stratify=y, random_state=seed)
 
 
-def load_or_train_model(
-    spark,
-    catalog: str,
-    schema: str,
-    model_name: str,
-    model_alias: str,
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
-    seed: int = 42,
-):
-    """Carrega do Model Registry (Unity Catalog); se o alias ainda não existir,
-    treina um baseline, registra e aponta o alias para a nova versão."""
+def load_champion_model(catalog: str, schema: str, model_name: str, model_alias: str):
+    """Carrega o modelo do Registry. Falha alto se não conseguir — este
+    notebook valida o modelo de produção; ele nunca treina nem promove um."""
     mlflow.set_registry_uri("databricks-uc")
-    full_model_name = f"{catalog}.{schema}.{model_name}"
-
+    uri = f"models:/{catalog}.{schema}.{model_name}@{model_alias}"
     try:
-        model = mlflow.xgboost.load_model(f"models:/{full_model_name}@{model_alias}")
-        print(f"Modelo carregado do Registry: models:/{full_model_name}@{model_alias}")
-        return model
-    except Exception:
-        print(
-            f"Alias '@{model_alias}' ainda não existe para '{full_model_name}'. Treinando baseline..."
-        )
-
-    with mlflow.start_run(run_name="baseline_xgb_validacao"):
-        model = xgb.XGBClassifier(
-            n_estimators=300,
-            max_depth=4,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            eval_metric="auc",
-            scale_pos_weight=(y_train == 0).sum() / (y_train == 1).sum(),
-            random_state=seed,
-        )
-        model.fit(X_train, y_train)
-        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-        mlflow.log_metric("auc_test", auc)
-
-        signature = infer_signature(X_train, model.predict_proba(X_train)[:, 1])
-        mlflow.xgboost.log_model(
-            model,
-            "model",
-            registered_model_name=full_model_name,
-            signature=signature,
-            input_example=X_train.head(5),
-        )
-        print(f"AUC baseline no teste: {auc:.4f}")
-
-        try:
-            client = mlflow.MlflowClient()
-            versoes = client.search_model_versions(f"name='{full_model_name}'")
-            ultima_versao = max(int(v.version) for v in versoes)
-            client.set_registered_model_alias(
-                name=full_model_name, alias=model_alias, version=ultima_versao
-            )
-            print(f"Alias '@{model_alias}' apontado para a versão {ultima_versao}.")
-        except Exception as e:
-            print(f"[AVISO] Não foi possível setar o alias automaticamente: {e}")
-
+        model = mlflow.xgboost.load_model(uri)
+    except Exception as e:
+        raise RuntimeError(
+            f"Não foi possível carregar {uri}. Rode o notebook de treino/registro antes "
+            f"de validar o modelo. Erro original: {e}"
+        ) from e
+    print(f"Modelo carregado do Registry: {uri}")
     return model
 
 
+# ------------------------------------------------------------------------------
+# Q1 — SHAP
+# ------------------------------------------------------------------------------
 def compute_shap_ranking(model, X_test: pd.DataFrame):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_test)
@@ -127,176 +128,315 @@ def compute_shap_ranking(model, X_test: pd.DataFrame):
     return ranking, shap_values
 
 
-def check_top_n(features_esperadas: list, top_features: set, top_n: int = 5) -> str:
-    presentes = [f for f in features_esperadas if f in top_features]
-    if len(presentes) == len(features_esperadas):
-        return "CONFIRMADA"
-    return "PARCIALMENTE CONFIRMADA" if presentes else "CONTRARIADA"
+# ------------------------------------------------------------------------------
+# Q2 — Threshold
+# ------------------------------------------------------------------------------
+def _custo(y_true, y_pred, custo_negar_bom, custo_aprovar_mau) -> dict:
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    return {
+        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+        "custo_total": float(fp * custo_negar_bom + fn * custo_aprovar_mau),
+        "taxa_aprovacao": float((tn + fn) / len(y_true)),
+    }
 
 
 def optimize_threshold_asymmetric(
     y_test: pd.Series,
     y_proba_test: np.ndarray,
+    threshold_operacional: float,
     custo_negar_bom: float = CUSTO_NEGAR_BOM_PAGADOR,
     custo_aprovar_mau: float = CUSTO_APROVAR_MAU_PAGADOR,
 ) -> dict:
-    """Q2 — varre thresholds minimizando custo esperado (FP × custo_negar_bom
-    + FN × custo_aprovar_mau), em vez de só respeitar um piso de aprovação."""
-    thresholds = np.linspace(0.01, 0.99, 99)
+    """Q2 — varre thresholds e encontra o de custo mínimo, comparando com o
+    threshold operacional. A diferença entre os dois é o 'preço' de manter
+    o piso de aprovação definido pelo negócio em H3."""
     rows = []
-    for t in thresholds:
-        y_pred = (y_proba_test >= t).astype(int)
-        tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
-        custo_total = fp * custo_negar_bom + fn * custo_aprovar_mau
-        rows.append(
-            {"threshold": t, "fp": fp, "fn": fn, "tp": tp, "tn": tn, "custo_total": custo_total}
-        )
+    for t in np.round(np.linspace(0.01, 0.99, 99), 2):
+        linha = _custo(y_test, (y_proba_test >= t).astype(int), custo_negar_bom, custo_aprovar_mau)
+        rows.append({"threshold": float(t), **linha})
 
     df_custos = pd.DataFrame(rows)
     melhor = df_custos.loc[df_custos["custo_total"].idxmin()]
-    custo_05 = df_custos.loc[(df_custos["threshold"] - 0.50).abs().idxmin()]
-
+    operacional = _custo(
+        y_test, (y_proba_test >= threshold_operacional).astype(int),
+        custo_negar_bom, custo_aprovar_mau,
+    )
     return {
         "df_custos": df_custos,
-        "threshold_otimo": float(melhor["threshold"]),
-        "custo_threshold_otimo": float(melhor["custo_total"]),
-        "custo_threshold_050": float(custo_05["custo_total"]),
-        "economia": float(custo_05["custo_total"] - melhor["custo_total"]),
-        "fp_otimo": int(melhor["fp"]),
-        "fn_otimo": int(melhor["fn"]),
+        "threshold_custo_minimo": float(melhor["threshold"]),
+        "custo_threshold_custo_minimo": float(melhor["custo_total"]),
+        "aprovacao_threshold_custo_minimo": float(melhor["taxa_aprovacao"]),
+        "threshold_operacional": float(threshold_operacional),
+        "custo_threshold_operacional": operacional["custo_total"],
+        "aprovacao_threshold_operacional": operacional["taxa_aprovacao"],
+        "custo_do_piso_de_aprovacao": operacional["custo_total"] - float(melhor["custo_total"]),
     }
 
 
+# ------------------------------------------------------------------------------
+# Q3 — Viés
+# ------------------------------------------------------------------------------
+def _intervalo_wilson(sucessos: int, n: int, z: float = Z_95) -> tuple:
+    """Intervalo de confiança de Wilson para uma proporção — mais estável
+    que o intervalo normal em grupos pequenos ou proporções extremas."""
+    if n == 0:
+        return (np.nan, np.nan)
+    p = sucessos / n
+    centro = (p + z**2 / (2 * n)) / (1 + z**2 / n)
+    margem = z * np.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / (1 + z**2 / n)
+    return (centro - margem, centro + margem)
+
+
+def faixa_idade(idade: pd.Series) -> pd.Series:
+    faixas = pd.cut(
+        idade,
+        bins=[18, 30, 40, 50, 60, np.inf],
+        labels=["18-30", "31-40", "41-50", "51-60", "60+"],
+        include_lowest=True,
+    )
+    return faixas.cat.add_categories("não informada").fillna("não informada")
+
+
+def faixa_renda(renda: pd.Series, n_faixas: int = 5) -> pd.Series:
+    """Quintis calculados só sobre quem informou renda; os demais formam uma
+    faixa própria em vez de serem tratados como renda zero."""
+    informada = renda.notna()
+    faixas = pd.Series("não informada", index=renda.index, dtype="object")
+    quintis = pd.qcut(renda[informada], q=n_faixas, duplicates="drop")
+    rotulos = [f"Q{i + 1}" for i in range(quintis.cat.categories.size)]
+    rotulos[0] += " (menor)"
+    rotulos[-1] += " (maior)"
+    faixas[informada] = quintis.cat.rename_categories(rotulos).astype(str)
+    ordem = rotulos + ["não informada"]
+    return pd.Categorical(faixas, categories=ordem, ordered=True)
+
+
 def _metricas_por_grupo(df_val: pd.DataFrame, coluna_grupo: str) -> pd.DataFrame:
+    """Por grupo: tamanho, inadimplência real, aprovação e os dois tipos de
+    erro. 'Bons negados' (FPR) é a métrica de justiça central: mede se bons
+    pagadores de um grupo pagam mais pelo erro do modelo que os de outro."""
+    fpr_geral = df_val.loc[df_val["y_true"] == 0, "y_pred"].mean()
     linhas = []
     for grupo, sub in df_val.groupby(coluna_grupo, observed=True):
         tn, fp, fn, tp = confusion_matrix(sub["y_true"], sub["y_pred"], labels=[0, 1]).ravel()
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else np.nan
-        fnr = fn / (fn + tp) if (fn + tp) > 0 else np.nan
-        acc = (tp + tn) / len(sub) if len(sub) > 0 else np.nan
+        n_bons, n_maus = tn + fp, fn + tp
+        ic_baixo, ic_alto = _intervalo_wilson(fp, n_bons)
         linhas.append(
             {
-                "grupo": grupo,
+                "grupo": str(grupo),
                 "n": len(sub),
-                "acuracia": acc,
-                "fpr_bons_negados": fpr,
-                "fnr_maus_aprovados": fnr,
+                "inadimplencia_real": n_maus / len(sub),
+                "taxa_aprovacao": (tn + fn) / len(sub),
+                "bons_negados": fp / n_bons if n_bons else np.nan,
+                "bons_negados_ic95": f"{ic_baixo:.1%}–{ic_alto:.1%}" if n_bons else "",
+                "maus_aprovados": fn / n_maus if n_maus else np.nan,
+                "amostra_pequena": n_bons < MIN_BONS_POR_GRUPO,
+                "_ic_baixo": ic_baixo,
             }
         )
-    return pd.DataFrame(linhas)
+    tabela = pd.DataFrame(linhas)
+    tabela["razao_aprovacao"] = tabela["taxa_aprovacao"] / tabela["taxa_aprovacao"].max()
+    # Bons negados significativamente acima da média geral: o limite inferior
+    # do IC do grupo fica acima da taxa geral
+    tabela["bons_negados_acima_da_media"] = tabela["_ic_baixo"] > fpr_geral
+    return tabela.drop(columns="_ic_baixo")
 
 
 def bias_analysis(
     X_test: pd.DataFrame, y_test: pd.Series, y_proba_test: np.ndarray, threshold: float
 ) -> dict:
-    """Q3 — performance por faixa de idade e de renda, com flag de
-    desproporcionalidade (métrica do grupo > média + 1 desvio-padrão)."""
+    """Q3 — viés por faixa de idade e de renda, no threshold informado
+    (use o operacional)."""
     df_val = X_test.copy()
     df_val["y_true"] = y_test.values
     df_val["y_proba"] = y_proba_test
     df_val["y_pred"] = (df_val["y_proba"] >= threshold).astype(int)
+    df_val["faixa_idade"] = faixa_idade(df_val["age"])
+    df_val["faixa_renda"] = faixa_renda(df_val["monthly_income"])
 
-    df_val["faixa_idade"] = pd.cut(
-        df_val["age"],
-        bins=[18, 30, 40, 50, 60, 100],
-        labels=["18-30", "31-40", "41-50", "51-60", "60+"],
-    )
-
-    renda_labels_padrao = ["Q1 (menor)", "Q2", "Q3", "Q4", "Q5 (maior)"]
-    faixa_renda = pd.qcut(df_val["monthly_income"].fillna(0), q=5, duplicates="drop")
-    aviso_renda = None
-    if faixa_renda.cat.categories.size == len(renda_labels_padrao):
-        faixa_renda = faixa_renda.cat.rename_categories(renda_labels_padrao)
-    else:
-        aviso_renda = (
-            f"faixa_renda: apenas {faixa_renda.cat.categories.size} faixas distintas geradas "
-            f"(esperado 5) — dados de 'monthly_income' concentrados/nulos."
-        )
-    df_val["faixa_renda"] = faixa_renda
-
-    tabela_idade = _metricas_por_grupo(df_val, "faixa_idade")
-    tabela_renda = _metricas_por_grupo(df_val, "faixa_renda")
+    tabelas = {
+        "idade": _metricas_por_grupo(df_val, "faixa_idade"),
+        "renda": _metricas_por_grupo(df_val, "faixa_renda"),
+    }
 
     alertas = []
-    for nome, tabela in [("idade", tabela_idade), ("renda", tabela_renda)]:
-        for metrica in ["fpr_bons_negados", "fnr_maus_aprovados"]:
-            media, desvio = tabela[metrica].mean(), tabela[metrica].std()
-            outliers = tabela[tabela[metrica] > media + desvio]
-            for _, row in outliers.iterrows():
+    for nome, tabela in tabelas.items():
+        for _, row in tabela.iterrows():
+            ressalva = " (amostra pequena — interpretar com cautela)" if row["amostra_pequena"] else ""
+            if row["razao_aprovacao"] < LIMIAR_RAZAO_APROVACAO:
                 alertas.append(
-                    f"[{nome}] grupo {row['grupo']}: {metrica} = {row[metrica]:.2%} (desproporcional)"
+                    f"[{nome}] {row['grupo']}: aprovação {row['taxa_aprovacao']:.1%} = "
+                    f"{row['razao_aprovacao']:.2f} da maior aprovação (< {LIMIAR_RAZAO_APROVACAO}); "
+                    f"inadimplência real do grupo: {row['inadimplencia_real']:.1%}{ressalva}"
+                )
+            if row["bons_negados_acima_da_media"]:
+                alertas.append(
+                    f"[{nome}] {row['grupo']}: bons pagadores negados {row['bons_negados']:.1%} "
+                    f"(IC95 {row['bons_negados_ic95']}), acima da média geral{ressalva}"
                 )
 
     return {
-        "tabela_idade": tabela_idade,
-        "tabela_renda": tabela_renda,
+        "tabela_idade": tabelas["idade"],
+        "tabela_renda": tabelas["renda"],
         "alertas": alertas,
-        "aviso_renda": aviso_renda,
         "df_val": df_val,
     }
 
 
-def financial_impact(
-    df_val: pd.DataFrame,
-    custo_negar_bom: float = CUSTO_NEGAR_BOM_PAGADOR,
-    valor_medio_operacao: float = VALOR_MEDIO_OPERACAO,
-    taxa_inadimplencia_politica_atual: float = None,
+# ------------------------------------------------------------------------------
+# Q3b — Calibração
+# ------------------------------------------------------------------------------
+def calibration_analysis(
+    y_test: pd.Series, y_proba_test: np.ndarray, n_bins: int = 10, seed: int = 42
 ) -> dict:
-    """Q4 — perda sem modelo (aprova todos) vs. com modelo (threshold ótimo)."""
-    n_operacoes = len(df_val)
-    taxa_sem_modelo = (
-        taxa_inadimplencia_politica_atual
-        if taxa_inadimplencia_politica_atual is not None
-        else df_val["y_true"].mean()
+    """Diagnostica se a probabilidade prevista corresponde à inadimplência
+    observada — necessário para usar o score na precificação, não só na
+    ordenação. Ajusta uma calibração isotônica em metade do teste e avalia
+    na outra metade (sem avaliar no mesmo dado em que calibrou).
+
+    A calibração isotônica é monotônica: não muda a ordenação dos clientes
+    (AUC e decisões de aprovação ficam iguais, com o threshold convertido
+    para a nova escala). Só corrige o valor da probabilidade."""
+    y = np.asarray(y_test)
+    idx_cal, idx_ava = train_test_split(
+        np.arange(len(y)), test_size=0.5, stratify=y, random_state=seed
     )
-    perda_sem_modelo = n_operacoes * taxa_sem_modelo * valor_medio_operacao
+    iso = IsotonicRegression(out_of_bounds="clip").fit(y_proba_test[idx_cal], y[idx_cal])
+    p_bruta, p_calibrada, y_ava = y_proba_test[idx_ava], iso.predict(y_proba_test[idx_ava]), y[idx_ava]
 
-    aprovados = df_val[df_val["y_pred"] == 0]
-    n_aprovados = len(aprovados)
-    taxa_com_modelo = aprovados["y_true"].mean() if n_aprovados > 0 else 0.0
-    perda_com_modelo = n_aprovados * taxa_com_modelo * valor_medio_operacao
-
-    bons_negados = df_val[(df_val["y_pred"] == 1) & (df_val["y_true"] == 0)]
-    custo_oportunidade = len(bons_negados) * custo_negar_bom
-
-    reducao_bruta = perda_sem_modelo - perda_com_modelo
-    impacto_liquido = reducao_bruta - custo_oportunidade
+    def _resumo(p):
+        obs, prev = calibration_curve(y_ava, p, n_bins=n_bins, strategy="quantile")
+        return {
+            "brier": float(brier_score_loss(y_ava, p)),
+            "media_prevista": float(p.mean()),
+            "erro_calibracao_medio": float(np.mean(np.abs(obs - prev))),
+            "curva": pd.DataFrame({"prob_prevista": prev, "inadimplencia_observada": obs}),
+        }
 
     return {
-        "n_operacoes": n_operacoes,
-        "taxa_sem_modelo": taxa_sem_modelo,
-        "perda_sem_modelo": perda_sem_modelo,
-        "taxa_com_modelo": taxa_com_modelo,
-        "perda_com_modelo": perda_com_modelo,
-        "reducao_bruta": reducao_bruta,
-        "custo_oportunidade": custo_oportunidade,
-        "impacto_liquido": impacto_liquido,
+        "inadimplencia_observada": float(y_ava.mean()),
+        "bruta": _resumo(p_bruta),
+        "calibrada": _resumo(p_calibrada),
+        "calibrador": iso,
     }
 
 
+# ------------------------------------------------------------------------------
+# Q3c — XGBoost vs. regressão logística na mesma taxa de aprovação
+# ------------------------------------------------------------------------------
+def _carteira_na_aprovacao(y_true: np.ndarray, proba: np.ndarray, taxa_aprovacao: float) -> dict:
+    """Aprova os `taxa_aprovacao` clientes de menor risco previsto."""
+    n_aprovados = int(round(taxa_aprovacao * len(y_true)))
+    aprovados = np.argsort(proba, kind="stable")[:n_aprovados]
+    mascara = np.zeros(len(y_true), dtype=bool)
+    mascara[aprovados] = True
+    return {
+        "inadimplencia_aprovados": float(y_true[mascara].mean()),
+        "maus_recusados": int(((~mascara) & (y_true == 1)).sum()),
+        "bons_negados": int(((~mascara) & (y_true == 0)).sum()),
+    }
+
+
+def compare_with_logistic(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    y_proba_xgb: np.ndarray,
+    taxa_aprovacao: float,
+) -> pd.DataFrame:
+    """Compara as duas carteiras aprovando a MESMA proporção de clientes.
+    Mede quanto o XGBoost agrega sobre um modelo mais simples, em vez de
+    comparar com 'aprovar todo mundo', política que nenhuma instituição usa.
+
+    A logística é treinada aqui, com imputação pela mediana e padronização,
+    no mesmo split; a AUC pode diferir um pouco da registrada no notebook
+    de treino se o pré-processamento de lá for outro."""
+    logistica = make_pipeline(
+        SimpleImputer(strategy="median"), StandardScaler(), LogisticRegression(max_iter=2000)
+    ).fit(X_train, y_train)
+    y_proba_lr = logistica.predict_proba(X_test)[:, 1]
+    y = np.asarray(y_test)
+
+    linhas = []
+    for nome, proba in [("XGBoost (@champion)", y_proba_xgb), ("Regressão logística", y_proba_lr)]:
+        linhas.append(
+            {"modelo": nome, "auc": float(roc_auc_score(y, proba)),
+             **_carteira_na_aprovacao(y, proba, taxa_aprovacao)}
+        )
+    return pd.DataFrame(linhas)
+
+
+# ------------------------------------------------------------------------------
+# Q4 — Impacto financeiro
+# ------------------------------------------------------------------------------
+def financial_impact(
+    df_val: pd.DataFrame,
+    custo_aprovar_mau: float = CUSTO_APROVAR_MAU_PAGADOR,
+    custo_negar_bom: float = CUSTO_NEGAR_BOM_PAGADOR,
+) -> dict:
+    """Q4 — perda evitada (maus recusados) vs. custo de oportunidade (bons
+    negados), com os MESMOS custos usados em Q2. Inclui o ponto de
+    equilíbrio: a razão perda/margem a partir da qual o modelo se paga —
+    uma resposta que não depende dos valores ilustrativos."""
+    maus_recusados = int(((df_val["y_pred"] == 1) & (df_val["y_true"] == 1)).sum())
+    bons_negados = int(((df_val["y_pred"] == 1) & (df_val["y_true"] == 0)).sum())
+    aprovados = df_val[df_val["y_pred"] == 0]
+
+    perda_evitada = maus_recusados * custo_aprovar_mau
+    custo_oportunidade = bons_negados * custo_negar_bom
+    return {
+        "n_operacoes": len(df_val),
+        "taxa_aprovacao": len(aprovados) / len(df_val),
+        "taxa_sem_modelo": float(df_val["y_true"].mean()),
+        "taxa_com_modelo": float(aprovados["y_true"].mean()) if len(aprovados) else 0.0,
+        "maus_recusados": maus_recusados,
+        "bons_negados": bons_negados,
+        "perda_evitada": perda_evitada,
+        "custo_oportunidade": custo_oportunidade,
+        "impacto_liquido": perda_evitada - custo_oportunidade,
+        "razao_equilibrio_perda_margem": bons_negados / maus_recusados if maus_recusados else np.nan,
+    }
+
+
+# ------------------------------------------------------------------------------
+# Registro
+# ------------------------------------------------------------------------------
 def log_validation_to_mlflow(
     threshold_result: dict,
     financial_result: dict,
     ranking_shap: pd.DataFrame,
     bias_result: dict,
-    status_h1: str,
-    status_h2: str,
+    calibration_result: dict,
+    comparison: pd.DataFrame,
 ) -> None:
     with mlflow.start_run(run_name="validacao_shap_threshold_vies_roi"):
-        mlflow.log_param("threshold_otimo", threshold_result["threshold_otimo"])
-        mlflow.log_param("custo_aprovar_mau_pagador", CUSTO_APROVAR_MAU_PAGADOR)
-        mlflow.log_param("custo_negar_bom_pagador", CUSTO_NEGAR_BOM_PAGADOR)
-        mlflow.log_metric("custo_total_threshold_otimo", threshold_result["custo_threshold_otimo"])
-        mlflow.log_metric("impacto_financeiro_liquido", financial_result["impacto_liquido"])
-        mlflow.log_metric("taxa_inadimplencia_sem_modelo", financial_result["taxa_sem_modelo"])
-        mlflow.log_metric("taxa_inadimplencia_com_modelo", financial_result["taxa_com_modelo"])
+        mlflow.log_params(
+            {
+                "threshold_operacional": threshold_result["threshold_operacional"],
+                "threshold_custo_minimo": threshold_result["threshold_custo_minimo"],
+                "custo_aprovar_mau_pagador": CUSTO_APROVAR_MAU_PAGADOR,
+                "custo_negar_bom_pagador": CUSTO_NEGAR_BOM_PAGADOR,
+                "limiar_razao_aprovacao": LIMIAR_RAZAO_APROVACAO,
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "custo_do_piso_de_aprovacao": threshold_result["custo_do_piso_de_aprovacao"],
+                "impacto_financeiro_liquido": financial_result["impacto_liquido"],
+                "razao_equilibrio_perda_margem": financial_result["razao_equilibrio_perda_margem"],
+                "taxa_inadimplencia_sem_modelo": financial_result["taxa_sem_modelo"],
+                "taxa_inadimplencia_com_modelo": financial_result["taxa_com_modelo"],
+                "qtd_alertas_vies": len(bias_result["alertas"]),
+                "brier_bruto": calibration_result["bruta"]["brier"],
+                "brier_calibrado": calibration_result["calibrada"]["brier"],
+                "erro_calibracao_bruto": calibration_result["bruta"]["erro_calibracao_medio"],
+                "erro_calibracao_calibrado": calibration_result["calibrada"]["erro_calibracao_medio"],
+            }
+        )
         mlflow.log_dict(ranking_shap.to_dict(orient="records"), "shap_ranking.json")
-        mlflow.log_dict(
-            bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json"
-        )
-        mlflow.log_dict(
-            bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json"
-        )
-        mlflow.log_param("h1_status", status_h1)
-        mlflow.log_param("h2_status", status_h2)
+        mlflow.log_dict(bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json")
+        mlflow.log_dict(bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json")
+        mlflow.log_dict({"alertas": bias_result["alertas"]}, "alertas_vies.json")
+        mlflow.log_dict(comparison.to_dict(orient="records"), "comparacao_logistica.json")
     print("\nValidação concluída e registrada no MLflow.")

@@ -29,6 +29,13 @@
 #     com 5 grupos dispara quase sempre, por acaso.
 #   - Removidas as checagens H1/H2 de top-5: usavam definições antigas das
 #     hipóteses, diferentes das de hypothesis_validation.py.
+#   - Checagem de reprodutibilidade do split: a AUC recalculada no teste
+#     precisa ser igual à registrada no run de treino do @champion. Se o
+#     split mudar (ex.: o Spark devolver as linhas em outra ordem), o teste
+#     passaria a conter clientes vistos no treino e as métricas sairiam
+#     otimistas — a checagem interrompe a execução antes disso.
+#   - A regressão logística da comparação segue a definição do baseline do
+#     projeto (hypothesis_validation.train_models: class_weight="balanced").
 # ==============================================================================
 
 import logging
@@ -110,6 +117,40 @@ def load_champion_model(catalog: str, schema: str, model_name: str, model_alias:
         ) from e
     print(f"Modelo carregado do Registry: {uri}")
     return model
+
+
+def verificar_split_do_champion(
+    catalog: str,
+    schema: str,
+    model_name: str,
+    model_alias: str,
+    auc_recalculada: float,
+    metrica_treino: str = "auc_test",
+    tolerancia: float = 1e-6,
+) -> float:
+    """Compara a AUC recalculada no teste com a registrada no run de treino
+    do @champion. Iguais = o teste de agora é o mesmo do treino (sem
+    vazamento). Diferentes = o split mudou; falha alto."""
+    client = mlflow.MlflowClient(registry_uri="databricks-uc")
+    versao = client.get_model_version_by_alias(f"{catalog}.{schema}.{model_name}", model_alias)
+    metricas = client.get_run(versao.run_id).data.metrics
+    if metrica_treino not in metricas:
+        raise RuntimeError(
+            f"O run de treino da versão {versao.version} não tem a métrica '{metrica_treino}'; "
+            f"não é possível verificar se o split de teste é o mesmo do treino."
+        )
+    auc_treino = float(metricas[metrica_treino])
+    if abs(auc_treino - auc_recalculada) > tolerancia:
+        raise RuntimeError(
+            f"[FALHA] AUC no teste ({auc_recalculada:.6f}) difere da registrada no treino da "
+            f"versão {versao.version} ({auc_treino:.6f}). O split de teste não é o mesmo do treino: "
+            f"parte dos clientes pode ter sido vista pelo modelo e as métricas sairiam otimistas."
+        )
+    print(
+        f"[OK] Split de teste idêntico ao do treino da versão {versao.version} "
+        f"(AUC {auc_recalculada:.6f} = {auc_treino:.6f})."
+    )
+    return auc_treino
 
 
 # ------------------------------------------------------------------------------
@@ -349,11 +390,13 @@ def compare_with_logistic(
     Mede quanto o XGBoost agrega sobre um modelo mais simples, em vez de
     comparar com 'aprovar todo mundo', política que nenhuma instituição usa.
 
-    A logística é treinada aqui, com imputação pela mediana e padronização,
-    no mesmo split; a AUC pode diferir um pouco da registrada no notebook
-    de treino se o pré-processamento de lá for outro."""
+    A logística segue a definição do baseline do projeto
+    (hypothesis_validation.train_models): imputação pela mediana ajustada
+    no treino, padronização e class_weight="balanced"."""
     logistica = make_pipeline(
-        SimpleImputer(strategy="median"), StandardScaler(), LogisticRegression(max_iter=2000)
+        SimpleImputer(strategy="median"),
+        StandardScaler(),
+        LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42),
     ).fit(X_train, y_train)
     y_proba_lr = logistica.predict_proba(X_test)[:, 1]
     y = np.asarray(y_test)
