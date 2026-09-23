@@ -70,6 +70,10 @@ mlflow.set_experiment(MONITORING_EXPERIMENT)
 
 # COMMAND ----------
 
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ml")
+
+# COMMAND ----------
+
 # =========================
 # 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_data_drift.py
 # =========================
@@ -190,3 +194,16 @@ df_drift["n_atual"] = len(df_atual)
 spark.createDataFrame(df_drift).write.mode("append").saveAsTable(OUTPUT_TABLE)
 
 print(f"\nResultado gravado em {OUTPUT_TABLE} e logado no experimento '{MONITORING_EXPERIMENT}'.")
+
+# COMMAND ----------
+
+# for cat in ["credito_dev", "catalog_mz"]:
+#     try:
+#         r = spark.sql(f"""
+#             SELECT COUNT(*) AS total,
+#                    COUNT_IF(target_dlq_2yrs IS NULL) AS sem_rotulo
+#             FROM {cat}.gold.fct_credit_profile
+#         """).first()
+#         print(f"{cat}: total={r['total']} | sem_rotulo={r['sem_rotulo']}")
+#     except Exception as e:
+#         print(f"{cat}: ERRO -> {str(e)[:150]}")%md
