@@ -47,12 +47,23 @@
 # tratam qualquer coluna não listada em `cols_to_ignore`/`ID_COLS` como
 # feature de modelo — incluir as flags aqui as transformaria em feature sem
 # ninguém decidir isso conscientemente.
+#
+# COLISÃO DE customer_id: cs-training.csv e cs-test.csv numeram clientes a
+# partir de 1. Sem tratamento, após o UNION os IDs 1..~101.503 apareceriam
+# duas vezes (clientes diferentes), o dropDuplicates da dim_customer
+# descartaria metade deles em silêncio e o JOIN fct x dim atribuiria idade
+# errada a treino e scoring. Por isso os IDs do scoring recebem
+# SCORING_ID_OFFSET antes do UNION, e a unicidade é verificada logo depois.
 # ==============================================================================
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 DIM_CUSTOMER_COLUMNS = ["customer_id", "age", "num_dependents"]
+
+# Deslocamento aplicado aos IDs do scoring (cliente 1 do scoring -> 10.000.001).
+# Mantém customer_id inteiro, sem mudar o tipo esperado pelos notebooks.
+SCORING_ID_OFFSET = 10_000_000
 
 # Nome Silver -> nome Gold, para as colunas que só mudam de nome
 FCT_RENAME_MAP = {
@@ -115,7 +126,25 @@ def _read_silver_combined(
             f"de rodar de novo."
         )
 
-    return df_training.unionByName(df_scoring)
+    # IDs do scoring deslocados para não colidir com os do treino
+    df_scoring = df_scoring.withColumn(
+        "customer_id", F.col("customer_id") + F.lit(SCORING_ID_OFFSET)
+    )
+
+    df_combined = df_training.unionByName(df_scoring)
+
+    # Falha alto se ainda houver ID duplicado — dim_customer descartaria
+    # registros em silêncio no dropDuplicates
+    tem_duplicado = (
+        df_combined.groupBy("customer_id").count().filter(F.col("count") > 1).limit(1).count()
+    )
+    if tem_duplicado:
+        raise RuntimeError(
+            "[FALHA] customer_id duplicado após unir treino e scoring — "
+            "dim_customer perderia registros. Checar SCORING_ID_OFFSET."
+        )
+
+    return df_combined
     
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
@@ -215,7 +244,8 @@ def run_gold_ingestion(
     if dim_count == 0 or fct_count == 0:
         raise RuntimeError(
             f"[FALHA] Gold vazia após a ingestão — dim_customer={dim_count:,}, "
-            f"fct_credit_profile={fct_count:,}. Confirme se {silver_table} tem dados."
+            f"fct_credit_profile={fct_count:,}. Confirme se "
+            f"{catalog}.{silver_schema}.{silver_table_name} tem dados."
         )
 
     print(f"[OK] {dim_table} — {dim_count:,} linhas")

@@ -1,61 +1,130 @@
-# Risco de Crédito — Score de Probabilidade de Inadimplência  ok
+# Risco de Crédito — Score de Probabilidade de Inadimplência
 
 *Parte da série **Databricks de Ponta a Ponta***
 
 ![CI](https://github.com/<seu-usuario>/risco-credito-databricks/actions/workflows/ci.yml/badge.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
+> Projeto de estudo com dados públicos (Kaggle *Give Me Some Credit*). Valores financeiros são ilustrativos e não representam dados de nenhuma instituição real.
+
+## Resumo executivo
+
+| Indicador | Resultado |
+|---|---|
+| ROC-AUC do modelo principal (XGBoost) | **0,867** (meta ≥ 0,85) — regressão logística: 0,788 |
+| Régua de corte escolhida (threshold) | **0,45** |
+| Taxa de aprovação | 100% → **72,8%** |
+| Inadimplência da carteira aprovada | 6,68% → **1,75%** (queda de ~74%) |
+| Impacto financeiro líquido estimado | **+R$ 14,5 mi** (parâmetros ilustrativos) |
+| Monitoramento pós-deploy | Data drift (PSI + KS por feature) e concept drift (queda de AUC-ROC) com histórico em Delta e MLflow |
+
+**Em uma frase:** o risco é explicado principalmente pelo **comportamento** do cliente (uso do limite e histórico de atrasos), e um corte em 0,45 reduz a inadimplência em ~74% mantendo a aprovação acima do piso de 70%. O peso da idade no modelo exige checagem de viés antes de qualquer uso real.
+
 ## Problema de negócio
-Uma instituição financeira precisa decidir, para cada solicitação de crédito, se aprova ou não a operação — e com qual taxa de juros. A decisão precisa ser rápida, consistente entre analistas, e defensável em auditoria. O objetivo deste projeto é construir um score de probabilidade de inadimplência que sustente essa decisão de ponta a ponta: da ingestão do dado até um endpoint em produção monitorado.
+Uma instituição financeira precisa decidir, para cada solicitação de crédito, se aprova ou não a operação — e com qual taxa de juros. A decisão precisa ser rápida, consistente entre analistas e defensável em auditoria. O objetivo deste projeto é construir um score de probabilidade de inadimplência que sustente essa decisão de ponta a ponta: da ingestão do dado até um endpoint em produção monitorado.
 
 ## Base de dados
 - **Give Me Some Credit** (Kaggle) — https://www.kaggle.com/c/GiveMeSomeCredit — ~150.000 registros de clientes pessoa física, 10 variáveis explicativas (utilização de crédito rotativo, idade, número de dependentes, histórico de atraso, dívida/renda, entre outras) e variável-alvo `SeriousDlqin2yrs` (1 = inadimplência em 90+ dias nos próximos 2 anos)
 - **SCR.data** (BACEN, dados agregados) — https://dadosabertos.bcb.gov.br/dataset/scr_data — usado como referência externa para comparar a taxa de inadimplência do modelo com a média nacional por segmento, não como dado de treino
 
 ## Métrica-alvo
-- **Métrica primária:** AUC-ROC ≥ 0,85 no conjunto de teste (referência de mercado: soluções de topo da competição original Kaggle atingem ~0,86–0,87)
+- **Métrica primária:** AUC-ROC ≥ 0,85 no conjunto de teste (referência de mercado: soluções de topo da competição original Kaggle atingem ~0,86–0,87) — **atingida: 0,867**
 - **Métricas complementares:** KS-statistic (separação entre bons e maus pagadores), recall na classe inadimplente a um nível de precisão definido pelo negócio
 - **Métrica de negócio:** estimativa de redução de inadimplência em R$ comparando a política "com modelo" vs. a política atual (aprovação sem score)
 
 ## Hipóteses
 
-`H1` — Utilização de crédito rotativo
+As quatro hipóteses seguem uma progressão em duas camadas. Não faz sentido decidir threshold ou calcular impacto em R$ (Camada 2) de um modelo em que ainda não se confia (Camada 1).
 
-Clientes com maior revolving_utilization (RevolvingUtilizationOfUnsecuredLines — percentual do limite de crédito já utilizado) têm probabilidade significativamente maior de inadimplência nos próximos 2 anos, porque um uso próximo do limite indica menor folga financeira.
+- **Camada 1 — Confiança no modelo (H1 e H2):** o modelo aprende algo que faz sentido de negócio, ou acerta por motivos que ninguém consegue explicar?
+- **Camada 2 — Decisão operacional (H3 e H4):** dado que o modelo é confiável, que corte usar e se vale a pena financeiramente.
 
-Camada: validação técnica (confiança no modelo)
-Testada por: correlação entre o valor da feature e seu próprio SHAP value
+| Hipótese | Enunciado | Como foi testada | Decisão que sustenta |
+|---|---|---|---|
+| **H1** — Utilização do rotativo | Clientes com maior `revolving_utilization` têm probabilidade significativamente maior de inadimplência, porque uso próximo do limite indica menor folga financeira | Relação entre o valor da feature e seu próprio SHAP value | Confiar ou não no modelo |
+| **H2** — Dívida/renda como preditor dominante | `debt_ratio` tem poder preditivo maior que `age` — capacidade de pagamento pesa mais que perfil demográfico | Comparação do \|SHAP\| médio entre `debt_ratio` e `age`, com margem relativa mínima de 10% | Aprovar o modelo em compliance/auditoria |
+| **H3** — Threshold ótimo | Existe um ponto de corte que reduz a inadimplência da carteira aprovada sem derrubar a aprovação abaixo de um piso viável | Varredura de thresholds sobre `y_pred_xgb`, filtrando pelo piso de aprovação (70%, ilustrativo) e escolhendo o de menor inadimplência entre os viáveis | Definir a regra operacional de aprovação |
+| **H4** — Impacto financeiro | O modelo teria evitado mais perdas em R$ do que o custo de rejeitar bons pagadores | Perda evitada (maus rejeitados × custo médio de inadimplência) vs. custo de oportunidade (bons rejeitados × margem média), no threshold de H3 | Aprovar (ou não) o investimento em produção |
 
-`H2` — Dívida/renda como preditor dominante
+## Resultados das hipóteses
 
-O debt_ratio (DebtRatio — relação dívida/renda) tem poder preditivo maior que a idade do cliente (age) isoladamente — ou seja, a capacidade de pagamento pesa mais na inadimplência do que o perfil demográfico.
+Os gráficos abaixo foram gerados no notebook `01_hipoteses_h1_h4`.
 
-Camada: validação técnica (confiança no modelo)
-Testada por: comparação do |SHAP| médio entre debt_ratio e age, com margem relativa mínima de 10%
+### Importância das variáveis (ranking SHAP)
 
-`H3` — Threshold ótimo de aprovação
+![Ranking SHAP](imagens/00_ranking_shap.png)
 
-Existe um ponto de corte de probabilidade que reduz a inadimplência da carteira aprovada, sem derrubar a taxa de aprovação total abaixo de um piso viável para o negócio.
+Duas variáveis dominam com folga: **uso do crédito rotativo** (|SHAP| médio 0,75) e **total de eventos de atraso** (0,68). Depois vem um degrau grande: idade (0,25), número de linhas de crédito abertas (0,20) e dívida/renda (0,15).
 
-Camada: decisão operacional
-Testada por: varredura de thresholds sobre y_pred_xgb, filtrando pelo piso mínimo de aprovação (70%, valor ilustrativo) e escolhendo o de menor inadimplência entre os viáveis
+**Leitura:** o risco é explicado principalmente pelo comportamento (como o cliente usa o crédito e se já atrasou), e não pelo perfil (renda, dependentes, imóveis).
 
-`H4` — Impacto financeiro vs. política atual
+> Os atrasos de 30–59, 60–89 e 90+ dias aparecem no fim do ranking provavelmente porque já estão somados em `total_delinquency_events`. A informação não é irrelevante: está concentrada na variável agregada.
 
-O modelo, aplicado retroativamente à base histórica, teria evitado um volume de perdas em R$ maior do que o custo de rejeitar bons pagadores (falsos positivos).
+### H1 — Uso do rotativo vs. impacto no risco ✅ Confirmada
 
-Camada: decisão operacional
-Testada por: comparação entre perda evitada (maus pagadores rejeitados × custo médio de inadimplência) e custo de oportunidade (bons pagadores rejeitados × margem média perdida), usando o threshold definido em H3
+![H1](imagens/h1_rotativo_shap.png)
+
+Cada ponto é um cliente: eixo horizontal = fração do limite utilizada; eixo vertical = contribuição SHAP para o risco. A relação é praticamente uma escada subindo: uso perto de 0% reduz o risco, por volta de **35–40%** a variável passa a prejudicar e perto de **100% (limite estourado)** o risco dispara.
+
+**Implicação:** o uso do limite é o alerta mais forte do modelo e pode virar regra operacional — monitorar clientes da carteira que cruzam ~40% e ~90% de uso.
+
+> **Nota metodológica:** a correlação de Pearson exibida no gráfico (0,071) subestima a relação, porque é distorcida por outliers extremos (há clientes com utilização na casa dos milhares, cortados pelo `xlim` em 2,0). A correlação de Spearman, ou o cálculo restrito ao intervalo 0–1, representa melhor a relação monotônica visível no gráfico.
+
+### H2 — Dívida/renda vs. idade ❌ Contrariada
+
+![H2](imagens/h2_debt_ratio_vs_age.png)
+
+A hipótese era que dívida/renda superaria idade. Deu o contrário: idade (|SHAP| 0,246) pesa **41% a mais** que dívida/renda (0,145).
+
+**Implicações:**
+1. **Negócio:** vale mais olhar *como* o cliente usa o crédito (H1) do que o índice de endividamento declarado — renda autodeclarada costuma ser pouco confiável.
+2. **Risco regulatório:** o peso da idade pode gerar tratamento desigual por faixa etária. Isso será verificado no notebook 02 (viés por idade/renda) antes de qualquer uso real.
+
+### H3 — Aprovação vs. inadimplência por threshold ✅ Confirmada
+
+![H3](imagens/h3_threshold.png)
+
+Linha azul: % de aprovados (eixo esquerdo). Linha vermelha: % de inadimplentes entre os aprovados (eixo direito). Tracejado cinza: piso de aprovação (70%). Pontilhado vermelho: inadimplência sem modelo (6,68%). Linha verde: régua escolhida.
+
+| | Sem modelo | Com modelo (threshold 0,45) |
+|---|---|---|
+| Taxa de aprovação | 100% | 72,8% |
+| Inadimplência da carteira | 6,68% | **1,75%** |
+
+**Implicação:** recusando ~27% dos pedidos, a inadimplência cai ~74%. O threshold funciona como botão de estratégia: subir a régua favorece crescimento com mais risco; descer protege caixa. O gráfico mostra o preço de cada escolha.
+
+### H4 — Impacto financeiro líquido ✅ Confirmada
+
+![H4 impacto financeiro](imagens/h4_impacto_financeiro.png)
+
+| Componente | Cálculo | Valor |
+|---|---|---|
+| Perda evitada | 1.622 maus pagadores recusados × ~R$ 15 mil | +R$ 24,3 mi |
+| Custo de oportunidade | 6.538 bons pagadores recusados × ~R$ 1,5 mil | –R$ 9,8 mi |
+| **Impacto líquido** | | **+R$ 14,5 mi** |
+
+**Implicação:** de cada 5 clientes recusados, só 1 era de fato mau pagador. Mesmo assim o modelo compensa, porque um calote custa ~10 vezes a margem de um bom cliente.
+
+> **Ressalva:** perda e margem são **parâmetros ilustrativos** (`business_params.py`). O valor só vira argumento de investimento com dados financeiros reais; se a razão perda/margem for bem menor que 10:1, o resultado pode encolher bastante.
+
+### Resumo por hipótese
+
+| Hipótese | Conclusão | Status |
+|---|---|---|
+| H1 | O uso do limite é o principal alarme de risco | ✅ Confirmada |
+| H2 | Dívida/renda importa menos que o esperado; o peso da idade precisa de checagem de viés | ❌ Contrariada |
+| H3 | Dá para cortar a inadimplência em ~74% aprovando ~73% dos pedidos | ✅ Confirmada |
+| H4 | O modelo se paga, com a ressalva de que os valores em reais são simulados | ✅ Confirmada |
 
 ## Perguntas de investigação
-1. **Quais variáveis têm maior poder preditivo** para inadimplência, segundo a importância de features via SHAP — e essa ordem confirma ou contraria as hipóteses H1 e H2?
-2. **Existe um ponto de corte (threshold) de probabilidade** que equilibra de forma ótima aprovar bons pagadores e reter maus pagadores, considerando o custo assimétrico entre os dois tipos de erro (negar crédito bom vs. aprovar crédito ruim)?
-3. **O modelo mantém performance estável entre diferentes faixas de renda e idade**, ou há uma faixa em que a taxa de erro é desproporcionalmente maior (checagem de viés antes de colocar em produção)?
-4. **Qual o impacto financeiro estimado** (redução de inadimplência em R$, usando um valor médio de operação de crédito como referência) se o modelo fosse adotado em produção, comparado à política atual sem modelo?
+1. **Quais variáveis têm maior poder preditivo?** → respondida no ranking SHAP e em H1/H2.
+2. **Existe um threshold que equilibra aprovação e inadimplência?** → respondida em H3 (0,45).
+3. **O modelo mantém performance estável entre faixas de renda e idade?** → *em andamento* (notebook 02). Uma execução exploratória anterior sinalizou taxa elevada de bons pagadores negados na faixa 18–30 anos e de maus pagadores aprovados nas faixas 60+ e de renda mais alta; a análise será refeita com o threshold 0,45.
+4. **Qual o impacto financeiro estimado?** → respondida em H4 (+R$ 14,5 mi, ilustrativo).
 
 ## Modelo
-- **Modelo principal:** Gradient Boosting (XGBoost) — dado tabular, alvo binário desbalanceado (~6,7% de positivos), e a necessidade de capturar interações não lineares entre variáveis financeiras torna Gradient Boosting a escolha natural; é também o tipo de modelo que consistentemente performa melhor nas soluções de referência dessa competição
-- **Modelo de comparação (baseline interpretável):** Regressão Logística — usada como benchmark de interpretabilidade direta (coeficientes) e como piso de performance; a decisão final de qual modelo vai para produção é documentada comparando os dois, não assumida de antemão
-- **Explicabilidade:** SHAP obrigatório para o modelo principal — cada decisão de aprovação/negação precisa ser rastreável até as variáveis que mais pesaram, para sustentar a resposta ao cliente e à auditoria
+- **Modelo principal:** Gradient Boosting (XGBoost) — dado tabular, alvo binário desbalanceado (~6,7% de positivos) e necessidade de capturar interações não lineares entre variáveis financeiras
+- **Modelo de comparação (baseline interpretável):** Regressão Logística — benchmark de interpretabilidade e piso de performance (ROC-AUC 0,788 vs. 0,867 do XGBoost)
+- **Explicabilidade:** SHAP obrigatório para o modelo principal — cada decisão de aprovação/negação precisa ser rastreável até as variáveis que mais pesaram
 - **Tratamento do desbalanceamento:** class weighting ou SMOTE, com decisão documentada de qual técnica foi usada e por quê
 
 ## Arquitetura no Databricks (pipeline ponta a ponta)
@@ -63,169 +132,45 @@ Testada por: comparação entre perda evitada (maus pagadores rejeitados × cust
 2. **Silver** — tratamento de outliers (ex.: idade = 0, utilização de crédito > 10), imputação de nulos, padronização de schema
 3. **Gold / Feature Store** — feature table versionada, pronta para treino
 4. **Treino** — MLflow tracking de experimentos, comparação XGBoost vs. Regressão Logística
-5. **Registro** — MLflow Model Registry, promoção do modelo vencedor
-6. **Produção** — Model Serving, endpoint real
-7. **Monitoramento** — Lakehouse Monitoring: drift de dados de entrada e de performance, alerta automático por limiar
+5. **Registro** — MLflow Model Registry no Unity Catalog (`credito_risco_xgb`), com o modelo vencedor promovido pelo alias `@champion`
+6. **Produção** — inferência batch (`03_inferencia_batch.py`) pontuando os registros ainda sem rótulo
+7. **Monitoramento** — notebooks de data drift e concept drift, com métricas no MLflow e histórico em tabelas Delta (detalhes abaixo)
 8. **Governança** — Unity Catalog com RBAC controlando quem acessa a feature table e o endpoint
 
+## Monitoramento pós-deploy
+
+O monitoramento responde a duas perguntas diferentes, tratadas em notebooks separados em `notebooks/monitoracao/`. A lógica de cálculo fica em `src/monitoring/`, em numpy/pandas puro, e é coberta por testes unitários (`tests/test_data_drift.py` e `tests/test_concept_drift.py`) que rodam sem cluster.
+
+| | Data drift | Concept drift |
+|---|---|---|
+| **Pergunta** | Os dados que estão chegando parecem com os dados de treino? | O modelo continua acertando, mesmo que os dados pareçam iguais? |
+| **Notebook** | `01_drift_dados.py` | `02_concept_drift.py` |
+| **Comparação** | Base de treino (Gold com rótulo) vs. lote de scoring (Gold sem rótulo) | AUC-ROC de referência vs. AUC-ROC do lote avaliado, usando o `@champion` |
+| **Métricas** | PSI por feature (bins pelos decis da referência) + KS como segunda leitura | Queda absoluta de AUC-ROC + KS do lote atual |
+| **Limiares** | PSI < 0,10 estável · 0,10–0,25 moderado · ≥ 0,25 severo | Alerta quando a AUC cai 0,03 ou mais |
+| **Saída** | `ml.monitoramento_drift_dados` + experimento MLflow | `ml.monitoramento_concept_drift` + experimento MLflow |
+
+Os limiares são pontos de partida documentados e devem ser calibrados com a área de risco.
+
+**Por que o concept drift roda em modo simulado.** O alvo tem horizonte de 24 meses: o resultado real de um cliente pontuado hoje só é conhecido cerca de dois anos depois. Sem esses rótulos atrasados, não há como medir a performance real em produção. O notebook foi preparado para os dois cenários:
+
+- **Modo real:** lê uma tabela de resultados realizados (`gold.resultados_realizados`) e compara com a AUC registrada como tag na versão do modelo. Essa tabela ainda não existe; quando ela não é encontrada, o notebook cai automaticamente para simulação.
+- **Modo simulado:** gera um lote sintético em que o peso de `debt_ratio` e `revolving_utilization` na relação com o alvo é deliberadamente enfraquecido. Serve para validar que a lógica de alerta dispara quando deveria. O valor absoluto da AUC sintética não é comparável ao do treino; o que importa é a queda relativa.
+
 ## Limitações assumidas
-- O dado é de 2011 (competição original) e de clientes americanos — usado aqui como base metodológica, não como fonte de verdade sobre o mercado brasileiro; o cruzamento com o SCR.data serve para contextualizar essa diferença, não para corrigi-la
+- O dado é de 2011 e de clientes americanos — usado como base metodológica, não como fonte de verdade sobre o mercado brasileiro; o cruzamento com o SCR.data contextualiza essa diferença, não a corrige
 - A variável-alvo tem 24 meses de horizonte; decisões de crédito com prazo diferente exigiriam reavaliação do problema
+- Custo de inadimplência, margem e piso de aprovação são parâmetros ilustrativos
+- O peso relevante de `age` no modelo exige análise de viés antes de qualquer uso em decisão real
+- O concept drift só pode ser medido de verdade com rótulos realizados, que chegam com cerca de 24 meses de atraso; até lá, o monitoramento de performance é validado apenas em simulação e o data drift funciona como alerta antecipado
+
+## Próximos passos
+- [ ] Concluir o notebook 02 (viés por idade e renda) com o threshold 0,45 e avaliar thresholds por segmento
+- [ ] Trocar Pearson por Spearman no teste de H1
+- [ ] Investigar a concentração de valores repetidos em `monthly_income` na camada Silver
+- [ ] Tratar features de contagem com muitos zeros no cálculo do PSI (bins por valor distinto em vez de decis)
+- [ ] Criar a tabela `resultados_realizados` para ativar o modo real do concept drift
+- [ ] Avaliar Model Serving para scoring em tempo real, complementando a inferência batch
 
 ## Status
-Em andamento — ingestão Bronze já implementada (`01_ingestao_bronze_autoloader.py`), seguindo roadmap de 9 fases.
-
-
----
-* JUSTIFICATIVA PARA O LEVANTAMENTO DAS HIPOTESES
-
-# Por que essas 4 hipóteses — e o que elas entregam para a decisão
-
-## O raciocínio por trás da escolha
-
-Antes de treinar qualquer modelo, definimos 4 perguntas que o projeto precisava responder — não por curiosidade estatística, mas porque cada uma delas sustenta uma decisão diferente que a Mezzo vai precisar tomar se decidir usar esse modelo na prática.
-
-As quatro seguem uma progressão lógica, em duas camadas:
-
-**Camada 1 — Confiança no modelo (H1 e H2):** o modelo está aprendendo algo que faz sentido de negócio, ou é uma caixa-preta que "acerta" por motivos que ninguém consegue explicar?
-
-**Camada 2 — Decisão operacional (H3 e H4):** dado que o modelo é confiável, o que fazer com ele na prática — que corte usar, e vale a pena financeiramente?
-
-Essa ordem não é acidental: não faz sentido decidir threshold ou calcular impacto em R$ (Camada 2) de um modelo em que ainda não se confia (Camada 1). Cada hipótese resolve um risco específico antes de avançar para a próxima.
-
----
-
-## H1 — O modelo reage a endividamento real, não a ruído
-
-**A pergunta:** clientes que já usam a maior parte do limite de crédito têm mais risco de inadimplência?
-
-**Por que essa pergunta importa:** essa é a variável mais intuitiva de risco de crédito que existe — se o modelo não capturar esse padrão, é sinal de que algo está errado no dado ou no treinamento, antes mesmo de olhar qualquer resultado mais sofisticado.
-
-**O que a Mezzo ganha com a resposta:**
-- Se confirmada: primeira evidência concreta de que o modelo "pensa" como um analista de crédito pensaria — reduz o risco de estar aprovando um modelo que decide por motivos arbitrários.
-- Se não confirmada: alerta cedo de que há um problema no dado ou na engenharia de features, evitando colocar em produção um modelo com defeito silencioso.
-
----
-
-## H2 — Comportamento financeiro pesa mais do que perfil demográfico
-
-**A pergunta:** a situação financeira atual do cliente (quanto ele deve em relação ao que ganha) prediz melhor do que a idade dele sozinha?
-
-**Por que essa pergunta importa:** é uma proteção contra um risco sério — se o modelo decidisse principalmente com base em idade (uma característica demográfica), a Mezzo estaria exposta a um risco reputacional e potencialmente jurídico de estar discriminando por perfil, em vez de avaliar capacidade de pagamento real.
-
-**O que a Mezzo ganha com a resposta:**
-- Se confirmada: uma defesa objetiva e documentada de que o modelo decide com base em comportamento financeiro, não em perfil do cliente — argumento importante em qualquer auditoria interna, compliance, ou questionamento externo sobre critérios de aprovação.
-- Reforça a Camada 1: mais um sinal de que o modelo é confiável antes de operacionalizá-lo.
-
----
-
-## H3 — Existe um ponto de corte que funciona na prática
-
-**A pergunta:** dá para usar esse modelo para aprovar ou negar crédito de um jeito que reduza inadimplência sem travar o negócio (aprovando poucos clientes demais)?
-
-**Por que essa pergunta importa:** um modelo tecnicamente bom, mas sem um ponto de corte definido, não é operacional — ninguém aprova crédito com "uma probabilidade", alguém aprova ou nega. Essa hipótese converte o modelo em uma regra de decisão concreta.
-
-**O que a Mezzo ganha com a resposta:**
-- Um número (o threshold) que a área de crédito pode efetivamente usar no dia a dia.
-- Visibilidade do trade-off real: quanto se ganha em redução de inadimplência versus quanto se abre mão em volume de aprovação — decisão que hoje pode estar sendo feita sem esse tipo de embasamento quantitativo.
-
----
-
-## H4 — O modelo compensa financeiramente
-
-**A pergunta:** o dinheiro economizado ao evitar maus pagadores é maior do que o dinheiro perdido ao, por engano, recusar bons pagadores?
-
-**Por que essa pergunta importa:** é a pergunta que qualquer decisão de investimento em tecnologia precisa responder — reduzir inadimplência não vale a pena se, no processo, a Mezzo perder ainda mais receita rejeitando clientes bons. Essa hipótese traduz todo o trabalho técnico anterior em R$, a linguagem que sustenta uma decisão de negócio.
-
-**O que a Mezzo ganha com a resposta:**
-- Uma estimativa de impacto financeiro líquido — o número que justifica (ou não) o investimento em colocar o modelo em produção.
-- Uma base quantitativa para comparar "manter a política atual" vs. "adotar o modelo", em vez de uma decisão baseada em intuição.
-
----
-
-## Resumo para a decisão final
-
-| Hipótese | Pergunta que resolve | Decisão que sustenta |
-|---|---|---|
-| H1 | O modelo reage a endividamento real? | Confiar ou não no modelo |
-| H2 | O modelo evita viés demográfico? | Aprovar o modelo em compliance/auditoria |
-| H3 | Qual o ponto de corte prático? | Definir a regra operacional de aprovação |
-| H4 | Vale a pena financeiramente? | Aprovar (ou não) o investimento em produção |
-
-Juntas, as quatro hipóteses cobrem o caminho completo entre "o modelo funciona tecnicamente" e "a Mezzo deve usar esse modelo, e de que forma" — que é exatamente a pergunta que importa para quem decide, não para quem constrói o modelo.
-
-
-
----
-## RESPONDENDO AS PERGUNTAS
-Excelente, o notebook rodou de ponta a ponta! Vou traduzir cada resultado para o que ele significa na prática.
-
-## Modelo treinado (antes das 4 perguntas)
-
-O baseline (XGBoost) teve **AUC = 0.8641**. AUC mede a capacidade do modelo de separar bons de maus pagadores numa escala de 0.5 (chute aleatório) a 1.0 (perfeito). 0.86 é um resultado bom para esse tipo de problema — o modelo discrimina bem quem tende a inadimplir.
-
----
-
-## Q1 — Quais variáveis mais pesam na decisão do modelo? (SHAP)
-
-**Top 5 do ranking:**
-1. `total_delinquency_events` (total de eventos de atraso)
-2. `revolving_utilization` (% do limite rotativo usado)
-3. `age`
-4. `num_open_credit_lines`
-5. `monthly_income`
-
-**H1 (atrasos específicos 30-59/60-89/90+ são os mais preditivos): CONTRARIADA.**
-Isso é um resultado interessante, não um erro: o modelo prefere a variável **agregada** `total_delinquency_events` a suas partes individuais (`num_times_30_59_days_late` etc.). Faz sentido do ponto de vista estatístico — quando você soma os atrasos em uma única métrica, ela captura o mesmo sinal das variáveis quebradas, só que de forma mais concentrada, então o modelo "usa" a soma e deixa as partes com menor importância marginal. Não significa que atraso não importa — significa que a forma agregada é mais eficiente que a fatiada.
-
-**H2 (utilização de crédito rotativo supera renda): CONFIRMADA.**
-`revolving_utilization` (rank 2) ficou muito à frente de `monthly_income` (rank 5). Ou seja: **o quanto a pessoa já está usando do limite disponível prevê inadimplência melhor do que quanto ela ganha**. Isso é consistente com a literatura de crédito — comportamento de uso é mais preditivo que nível de renda isolado.
-
----
-
-## Q2 — Qual o melhor ponto de corte (threshold) para aprovar/negar crédito?
-
-O modelo não decide sozinho "aprovado" ou "negado" — ele dá uma probabilidade (0 a 1) de inadimplência, e você escolhe a partir de qual probabilidade nega o crédito.
-
-- **Threshold ótimo encontrado: 0.56** (em vez do padrão ingênuo de 0.50)
-- Custo no threshold ótimo: **R$ 18,77 milhões**
-- Custo no threshold 0.50: R$ 18,98 milhões
-- **Economia: R$ 204 mil** só por ajustar esse corte
-
-Ou seja: negar crédito só quando o modelo está pelo menos 56% confiante de inadimplência (em vez de 50%) equilibra melhor o custo de negar bom pagador (R$1.500) vs. aprovar mau pagador (R$15.000). Como negar um mau pagador custa 10x mais que negar um bom, faz sentido o threshold subir um pouco — é um ajuste fino, não uma virada de mesa.
-
----
-
-## Q3 — O modelo trata todo mundo de forma justa? (viés por idade e renda)
-
-Aqui está o achado mais importante para você levar à discussão de negócio/compliance:
-
-**Por idade**, dois alertas automáticos dispararam:
-- **18-30 anos**: taxa de **bons pagadores negados indevidamente (FPR) de 29,7%** — muito acima da média das faixas. Jovens estão sendo penalizados desproporcionalmente, provavelmente por terem histórico de crédito mais curto (menos dados = modelo mais conservador/inseguro).
-- **60+ anos**: taxa de **maus pagadores aprovados por engano (FNR) de 48,3%** — quase metade dos inadimplentes dessa faixa passa pelo filtro. O modelo é "bonzinho demais" com idosos, deixando escapar risco real.
-
-**Por renda**, um alerta:
-- **Faixa mais alta de renda** (acima de R$8.250): FNR de **42,5%** — pessoas de renda alta que vão inadimplir também estão passando despercebidas com frequência. Pode ser porque o modelo associa (razoavelmente, mas não sempre corretamente) renda alta a menor risco.
-
-**Leitura de negócio:** o modelo não é neutro entre grupos. Ele é mais restritivo com jovens e mais permissivo com idosos e rendas altas. Isso é relevante tanto para performance de carteira (o buraco de inadimplência não detectada está concentrado em 60+ e renda alta) quanto para risco regulatório/reputacional (jovens sendo negados desproporcionalmente).
-
-*Nota à parte: o aviso de "apenas 4 faixas de renda" (em vez de 5) apareceu porque há concentração de valores repetidos/baixos em `monthly_income` — vale investigar a qualidade desse dado na Silver depois, pois pode estar distorcendo um pouco a análise por renda.*
-
----
-
-## Q4 — Quanto dinheiro o modelo economiza vs. aprovar todo mundo?
-
-| Cenário | Taxa de inadimplência | Perda estimada |
-|---|---|---|
-| Sem modelo (aprova todos) | 6,69% | R$ 30,08 milhões |
-| Com modelo (threshold ótimo) | 2,35% | R$ 8,57 milhões |
-
-- **Redução bruta de inadimplência: R$ 21,52 milhões**
-- Menos o **custo de oportunidade** de ter negado 5.375 bons pagadores (R$ 8,06 milhões em margem perdida)
-- **Impacto financeiro líquido estimado: R$ 13,45 milhões** em 37.500 operações analisadas
-
-Esse é o número-chave para o pitch de negócio: mesmo descontando o custo de errar (negar gente boa), o modelo entrega ~R$13,4 milhões de ganho líquido só na base de teste — e a taxa de inadimplência cai de 6,7% para 2,35%.
-
----
-
-**Resumo em uma frase:** o modelo funciona bem e é lucrativo, mas antes de ir para produção vale endereçar o viés contra jovens (Q3) e revisar por que a faixa de renda alta tem tanto mau pagador escapando (Q3), possivelmente recalibrando threshold por segmento em vez de um único corte global.
+Em andamento — ingestão, treino, validação das hipóteses H1–H4, registro do `@champion`, inferência batch e monitoramento de drift concluídos; análise de viés e rótulos realizados para concept drift pendentes.
