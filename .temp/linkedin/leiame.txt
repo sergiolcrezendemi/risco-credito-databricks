@@ -1,0 +1,41 @@
+#post
+
+    https://claude.ai/chat/45b93070-4973-4dfd-96d2-b136dbaed285
+
+
+Treinar um modelo com AUC de 0,867 foi a parte fácil. O difícil foi responder: dá para usar isso para aprovar crédito, e como saber se ele continua funcionando?
+
+Concluí um projeto de risco de crédito ponta a ponta no Databricks, com a base pública Give Me Some Credit, do Kaggle. Antes de treinar, defini 4 hipóteses de negócio. Alguns aprendizados:
+
+📉 O comportamento pesa mais que o perfil. Uso do limite e histórico de atrasos dominam o modelo. O risco sobe de forma clara a partir de ~40% de uso do limite.
+
+❌ Uma hipótese minha estava errada. Eu esperava que dívida/renda pesasse mais que idade. A idade pesou 41% a mais, o que em crédito é um alerta de possível viés etário.
+
+🎚️ O threshold é uma decisão de negócio. Com corte em 0,45, a inadimplência da carteira caiu de 6,7% para 1,75%, mantendo 73% de aprovação.
+
+💰 O modelo se paga enquanto um calote custar mais de ~4x a margem de um bom cliente. Em vez de depender de valores simulados, esse ponto de equilíbrio pode ser checado pelo negócio com números reais.
+
+📡 Monitoramento testado nos dois sentidos. Pontuei um lote de 101 mil clientes novos e nenhuma das 11 features apresentou drift. Para o concept drift, como o rótulo real só chega em 24 meses, simulei mudanças de intensidade crescente: sem mudança, nenhum alarme; a partir de 25% de intensidade, o alerta dispara.
+
+🔍 O que mais aprendi veio dos erros. A primeira simulação de drift não disparou o alerta: ela mexia justamente nas variáveis que o modelo quase não usa. E, ao juntar os dados de treino e de scoring, os IDs colidiam em silêncio e trocavam a idade de 100 mil clientes. Nenhum dos dois apareceria olhando só a métrica.
+
+Próximo passo: análise de viés por idade e renda.
+
+Repositório: [link]
+
+#DataScience #RiscoDeCredito #Databricks #MLOps #MachineLearning
+
+
+
+#pdf para anexar
+vide arquivo no diretorio
+
+
+
+#observar
+
+Troquei o detalhe sobre Pearson vs. Spearman pelos dois erros encontrados no pipeline. Eles mostram experiência de produção, que é o que mais pesa para vaga sênior. O detalhe do Pearson continua na página 3 do carrossel.
+
+Antes de publicar, confira se o repositório já tem o README atualizado e as imagens na pasta imagens/. Quem clicar no link vai direto para lá.
+
+

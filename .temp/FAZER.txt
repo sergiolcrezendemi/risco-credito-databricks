@@ -5,3 +5,9 @@
    *.temp/
    AWSTemplateFormatVersion: "2010-09-09"
 
+3- fazer perguntas sobre o projeto simulando um entrevista
+
+      quais as principais perguntas que um especialista pode fazer em um entrevita sobre o projeto?
+         (faça uma lista e detalhe de forma didática)
+
+         

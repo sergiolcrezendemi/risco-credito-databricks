@@ -15,7 +15,7 @@
 | Taxa de aprovação | 100% → **72,8%** |
 | Inadimplência da carteira aprovada | 6,68% → **1,75%** (queda de ~74%) |
 | Impacto financeiro líquido estimado | **+R$ 14,5 mi** (parâmetros ilustrativos) |
-| Monitoramento pós-deploy | Data drift (PSI + KS por feature) e concept drift (queda de AUC-ROC) com histórico em Delta e MLflow |
+| Monitoramento pós-deploy | Data drift sobre 101.503 clientes de scoring: 11 de 11 features estáveis (PSI máx. 0,0004). Concept drift: sem falso alarme sem drift e alerta a partir de 25% de intensidade (queda de AUC de 0,054) |
 
 **Em uma frase:** o risco é explicado principalmente pelo **comportamento** do cliente (uso do limite e histórico de atrasos), e um corte em 0,45 reduz a inadimplência em ~74% mantendo a aprovação acima do piso de 70%. O peso da idade no modelo exige checagem de viés antes de qualquer uso real.
 
@@ -133,7 +133,7 @@ Linha azul: % de aprovados (eixo esquerdo). Linha vermelha: % de inadimplentes e
 3. **Gold / Feature Store** — feature table versionada, pronta para treino
 4. **Treino** — MLflow tracking de experimentos, comparação XGBoost vs. Regressão Logística
 5. **Registro** — MLflow Model Registry no Unity Catalog (`credito_risco_xgb`), com o modelo vencedor promovido pelo alias `@champion`
-6. **Produção** — inferência batch (`03_inferencia_batch.py`) pontuando os registros ainda sem rótulo
+6. **Produção** — inferência batch (`03_inferencia_batch.py`) pontuando o lote de scoring (`cs-test.csv`, ~101 mil clientes sem rótulo), que passa pelas mesmas camadas Bronze → Silver → Gold do treino
 7. **Monitoramento** — notebooks de data drift e concept drift, com métricas no MLflow e histórico em tabelas Delta (detalhes abaixo)
 8. **Governança** — Unity Catalog com RBAC controlando quem acessa a feature table e o endpoint
 
@@ -152,10 +152,54 @@ O monitoramento responde a duas perguntas diferentes, tratadas em notebooks sepa
 
 Os limiares são pontos de partida documentados e devem ser calibrados com a área de risco.
 
+**Lote de scoring sem *training-serving skew*.** O `cs-test.csv` do Kaggle (clientes sem rótulo) entra como lote de produção e percorre o mesmo pipeline do treino. As regras da Silver são fixas (faixa de idade, códigos de erro nos atrasos, dependentes nulos), sem parâmetros calculados a partir dos dados, então o scoring recebe exatamente o mesmo tratamento. Na Gold, como os dois arquivos numeram clientes a partir de 1, os IDs do scoring recebem um deslocamento antes da união, e um teste de unicidade impede que a dimensão de clientes descarte registros em silêncio.
+
+### Resultado do data drift
+
+Referência: 150.000 clientes de treino. Lote avaliado: 101.503 clientes de scoring. A Gold ficou com 251.503 registros, sem IDs duplicados, e o resultado foi registrado no experimento MLflow `/Shared/credito_risco_monitoramento` e persistido em `credito_dev.ml.monitoramento_drift_dados`, que acumula o histórico a cada execução.
+
+| Feature | PSI | KS | Classificação |
+|---|---|---|---|
+| monthly_income | 0,00039 | 0,0044 | estável |
+| revolving_utilization | 0,00012 | 0,0031 | estável |
+| debt_ratio | 0,00011 | 0,0036 | estável |
+| num_open_credit_lines | 0,00011 | 0,0013 | estável |
+| num_real_estate_loans | 0,00005 | 0,0029 | estável |
+| total_delinquency_events | 0,00002 | 0,0018 | estável |
+| age | 0,00001 | 0,0012 | estável |
+| num_times_30_59_days_late | 0,00001 | 0,0010 | estável |
+| num_dependents | < 0,00001 | 0,0005 | estável |
+| num_times_60_89_days_late | 0* | 0,0003 | estável |
+| num_times_90_days_late | 0* | 0,0007 | estável |
+
+**Leitura:** nenhuma feature se aproxima do limiar de 0,10. É o resultado esperado, porque o Kaggle separou treino e teste aleatoriamente a partir da mesma população. A execução funciona como teste de falso alarme: o monitoramento não dispara quando não há mudança.
+
+\* **Limitação identificada:** nas duas features de atraso com quase todos os valores iguais a zero, os decis da referência colapsam e a função de PSI retorna 0 por construção, sem medir de fato. Neste lote o KS confirma que não há drift, mas um drift real nessas variáveis passaria despercebido pelo PSI. A correção (bins por valor distinto) está nos próximos passos.
+
 **Por que o concept drift roda em modo simulado.** O alvo tem horizonte de 24 meses: o resultado real de um cliente pontuado hoje só é conhecido cerca de dois anos depois. Sem esses rótulos atrasados, não há como medir a performance real em produção. O notebook foi preparado para os dois cenários:
 
 - **Modo real:** lê uma tabela de resultados realizados (`gold.resultados_realizados`) e compara com a AUC registrada como tag na versão do modelo. Essa tabela ainda não existe; quando ela não é encontrada, o notebook cai automaticamente para simulação.
-- **Modo simulado:** gera um lote sintético em que o peso de `debt_ratio` e `revolving_utilization` na relação com o alvo é deliberadamente enfraquecido. Serve para validar que a lógica de alerta dispara quando deveria. O valor absoluto da AUC sintética não é comparável ao do treino; o que importa é a queda relativa.
+- **Modo simulado:** gera lotes sintéticos em que os sinais comportamentais que o modelo mais usa (utilização do limite e histórico de atrasos) perdem força na relação com o alvo, com intensidade graduável de 0 (sem drift) a 1 (drift total). As features são idênticas em qualquer intensidade e a taxa de inadimplência fica fixa em 6,68%, o que isola a mudança em P(alvo | features). O valor absoluto da AUC sintética não é comparável ao do treino; o que importa é a queda relativa.
+
+### Resultado do concept drift (simulação)
+
+O `@champion` (versão 1) foi avaliado em uma referência sintética sem drift (AUC-ROC 0,809) e em seis lotes com intensidades crescentes de drift, 20.000 clientes cada.
+
+<!-- ![Ranking SHAP](imagens/00_ranking_shap.png) -->
+![Curva de sensibilidade do monitor de concept drift](imagens/concept_drift_sensibilidade.png)
+
+| Intensidade | AUC-ROC do lote | Queda | Alerta |
+|---|---|---|---|
+| 0,00 | 0,812 | –0,003 | não |
+| 0,10 | 0,792 | 0,017 | não |
+| 0,25 | 0,754 | 0,054 | **sim** |
+| 0,50 | 0,686 | 0,123 | sim |
+| 0,75 | 0,608 | 0,201 | sim |
+| 1,00 | 0,533 | 0,276 | sim |
+
+**Leitura:** o monitor não dispara quando a relação entre features e alvo não muda (intensidade 0) e passa a disparar a partir de 25% de intensidade. Drifts mais sutis, na faixa de 10%, ficam abaixo do limiar de 0,03; se a área de risco precisar detectá-los, o limiar pode ser reduzido, ao custo de mais alarmes falsos. Somado ao data drift, o monitoramento foi validado nos dois sentidos: não alarma sem mudança e alarma quando ela acontece.
+
+**Uma primeira versão da simulação não disparou o alerta.** Ela enfraquecia `debt_ratio`, variável fraca no modelo real, e gerava quase toda a utilização abaixo de 40%, faixa em que o modelo praticamente não reage. A queda de AUC foi de apenas 0,015. O gerador foi refeito para atuar nos sinais que o modelo de fato usa, e o comportamento do gerador passou a ser coberto por testes unitários (`tests/test_concept_drift_intensidade.py`).
 
 ## Limitações assumidas
 - O dado é de 2011 e de clientes americanos — usado como base metodológica, não como fonte de verdade sobre o mercado brasileiro; o cruzamento com o SCR.data contextualiza essa diferença, não a corrige
@@ -168,9 +212,9 @@ Os limiares são pontos de partida documentados e devem ser calibrados com a ár
 - [ ] Concluir o notebook 02 (viés por idade e renda) com o threshold 0,45 e avaliar thresholds por segmento
 - [ ] Trocar Pearson por Spearman no teste de H1
 - [ ] Investigar a concentração de valores repetidos em `monthly_income` na camada Silver
-- [ ] Tratar features de contagem com muitos zeros no cálculo do PSI (bins por valor distinto em vez de decis)
+- [ ] Tratar features de contagem com muitos zeros no cálculo do PSI (bins por valor distinto em vez de decis) — limitação confirmada na execução real
 - [ ] Criar a tabela `resultados_realizados` para ativar o modo real do concept drift
 - [ ] Avaliar Model Serving para scoring em tempo real, complementando a inferência batch
 
 ## Status
-Em andamento — ingestão, treino, validação das hipóteses H1–H4, registro do `@champion`, inferência batch e monitoramento de drift concluídos; análise de viés e rótulos realizados para concept drift pendentes.
+Em andamento — ingestão (treino e scoring), treino, validação das hipóteses H1–H4, registro do `@champion`, inferência batch, data drift e concept drift (simulado) executados; análise de viés e modo real do concept drift (depende de rótulos realizados) pendentes.
