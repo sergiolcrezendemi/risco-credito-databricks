@@ -3,6 +3,14 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
+# MAGIC %uv sync
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # =============================================================================
 # notebooks/monitoracao/02_concept_drift.py
 # -----------------------------------------------------------------------------
@@ -89,6 +97,10 @@ INTENSIDADES = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
 mlflow.set_experiment(MONITORING_EXPERIMENT)
 
 # O schema `ml` não é criado por nenhuma camada anterior do pipeline
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ml")
+
+# COMMAND ----------
+
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ml")
 
 # COMMAND ----------

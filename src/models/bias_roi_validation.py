@@ -1,4 +1,4 @@
-# src/models/bias_roi_validation.py
+# src/models/bias_roi_validation.py 
 # ==============================================================================
 # PERGUNTAS Q1-Q4 DO README (distintas das hipóteses H1-H4 — ver
 # src/models/hypothesis_validation.py para essas):

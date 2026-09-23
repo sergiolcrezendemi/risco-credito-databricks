@@ -3,6 +3,16 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
+# MAGIC %uv sync
+# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# MAGIC # uv sync   -> não funciona
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # =============================================================================
 # notebooks/ml/03_inferencia_batch.py
 # -----------------------------------------------------------------------------
@@ -23,6 +33,10 @@
 # ou por uma coluna explícita (ex.: `dataset_origem`), ajuste o WHERE da
 # seção 2 — o resto do notebook não muda.
 # =============================================================================
+
+# COMMAND ----------
+
+
 
 # COMMAND ----------
 

@@ -62,6 +62,8 @@ from pyspark.sql import functions as F
 DIM_CUSTOMER_COLUMNS = ["customer_id", "age", "num_dependents"]
 
 # Deslocamento aplicado aos IDs do scoring (cliente 1 do scoring -> 10.000.001).
+# Os dois CSVs do Kaggle numeram clientes a partir de 1; sem deslocamento,
+# IDs de treino e scoring colidem após o UNION.
 # Mantém customer_id inteiro, sem mudar o tipo esperado pelos notebooks.
 SCORING_ID_OFFSET = 10_000_000
 
