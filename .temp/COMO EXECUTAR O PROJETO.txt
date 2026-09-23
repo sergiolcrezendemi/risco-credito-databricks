@@ -1,0 +1,75 @@
+%md
+
+```
+fluxo para a carga inicial
+
+1- executar o job: job-ingestao 
+
+  manual:
+     /notebooks/ingestao/01_bronze
+                        02_silver
+                       03_gold
+
+  produtivo - via job
+      job-ingestao
+ 
+2- rodar o modelo produtivo  
+  manual:
+      hipotese|pergunta
+          /notebooks/ml/01_hipoteses-h1_h4
+                        02_vies_threshold_roi
+                        03_inferencia_batch
+
+  produtivo - via job:
+    ???
+
+3- rodar a monitoração 
+  manual:
+    /notebooks/monitoracao/01_drift_dados
+                           02_concept_drift
+
+    /src/monitoring/concept_drift
+                    data_drift
+- produtivo - via job:
+
+    ???    
+
+
+não tem no projeto
+
+- dashboard
+- o ambiente de homologação
+- o ambiente de produção
+- teste unitário
+
+
+
+
+
+```
+
+```
+fluxo para a carga de novos dados
+
+  manual:
+     /notebooks/ingestao/01_bronze
+                        02_silver
+                       03_gold
+
+  manual:
+      hipotese|pergunta
+          /notebooks/ml/ 03_inferencia_batch
+
+                    monitoracao/01_drift_dados: compara treino com o lote de scoring
+                    monitoracao/02_concept_drift: roda em modo simulado e não depende dos passos anteriores, então pode vir em qualquer ordem
+
+
+   rode os testes (opcional, mas recomendado): abra o test_bias_roi_validation.py e clique em Run tests. Os 6 devem passar. Se algum falhar, me mande a mensagem antes de seguir.
+   
+   Rode o notebook 02_vies_threshold_roi com "Run all". Confira se o widget threshold_operacional está em 0.45.
+
+  
+```
+
+
+
