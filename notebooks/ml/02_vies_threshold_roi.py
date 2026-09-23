@@ -7,11 +7,9 @@
 #   "xgboost>=2.0",
 # ]
 # ///
-# MAGIC %uv sync
-
-# COMMAND ----------
-
-dbutils.library.restartPython()
+# MAGIC %%sh
+# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# MAGIC uv sync
 
 # COMMAND ----------
 
@@ -92,7 +90,7 @@ y_proba_test = model.predict_proba(X_test)[:, 1]
 from sklearn.metrics import roc_auc_score
 
 brv.verificar_split_do_champion(
-    catalog, "gold", MODEL_NAME, MODEL_ALIAS, roc_auc_score(y_test, y_proba_test)
+    catalog, roc_auc_score(y_test, y_proba_test), "gold", MODEL_NAME, MODEL_ALIAS
 )
 
 # COMMAND ----------

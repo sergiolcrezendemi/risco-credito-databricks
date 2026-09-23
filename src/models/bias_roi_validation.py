@@ -34,47 +34,34 @@
 #     split mudar (ex.: o Spark devolver as linhas em outra ordem), o teste
 #     passaria a conter clientes vistos no treino e as métricas sairiam
 #     otimistas — a checagem interrompe a execução antes disso.
-#   - A regressão logística da comparação segue a definição do baseline do
-#     projeto (hypothesis_validation.train_models: class_weight="balanced").
+#   - Split, carregamento do @champion, checagem do split e regressão
+#     logística vêm de hypothesis_validation — definidos num só lugar.
 # ==============================================================================
 
 import logging
 
 import mlflow
-import mlflow.xgboost
 import numpy as np
 import pandas as pd
 import shap
 from sklearn.calibration import calibration_curve
-from sklearn.impute import SimpleImputer
 from sklearn.isotonic import IsotonicRegression
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, confusion_matrix, roc_auc_score
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-
 from src.config.business_params import (
     CUSTO_APROVAR_MAU_PAGADOR,
     CUSTO_NEGAR_BOM_PAGADOR,
 )
-from src.models.hypothesis_validation import TARGET_COL
+from src.models.hypothesis_validation import (  # noqa: F401 — reexportados para o notebook 02
+    FEATURE_COLS,
+    TARGET_COL,
+    load_champion_model,
+    prepare_train_test,
+    train_logreg,
+    verificar_split_do_champion,
+)
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
-
-FEATURE_COLS = [
-    "age",
-    "num_dependents",
-    "monthly_income",
-    "debt_ratio",
-    "revolving_utilization",
-    "num_open_credit_lines",
-    "num_real_estate_loans",
-    "num_times_30_59_days_late",
-    "num_times_60_89_days_late",
-    "num_times_90_days_late",
-    "total_delinquency_events",
-]
 
 # Critérios de viés (pontos de partida documentados — calibrar com risco/jurídico)
 LIMIAR_RAZAO_APROVACAO = 0.80  # regra dos 4/5
@@ -85,72 +72,9 @@ Z_95 = 1.96
 # ------------------------------------------------------------------------------
 # Dados e modelo
 # ------------------------------------------------------------------------------
-def prepare_train_test(df: pd.DataFrame, test_size: float = 0.25, seed: int = 42):
-    """Filtra linhas rotuladas (a Gold também contém o lote de scoring, com
-    alvo nulo) e separa treino/teste com as features explícitas.
-
-    ATENÇÃO: test_size, seed e a estratificação precisam ser os mesmos do
-    notebook de treino do @champion; senão o 'teste' contém clientes que o
-    modelo viu no treino e as métricas saem otimistas.
-    """
-    faltando = [c for c in FEATURE_COLS + [TARGET_COL] if c not in df.columns]
-    if faltando:
-        raise ValueError(f"Colunas ausentes nos dados de entrada: {faltando}")
-
-    df = df.dropna(subset=[TARGET_COL]).copy()
-    df[TARGET_COL] = df[TARGET_COL].astype(int)
-    X, y = df[FEATURE_COLS], df[TARGET_COL]
-    return train_test_split(X, y, test_size=test_size, stratify=y, random_state=seed)
-
-
-def load_champion_model(catalog: str, schema: str, model_name: str, model_alias: str):
-    """Carrega o modelo do Registry. Falha alto se não conseguir — este
-    notebook valida o modelo de produção; ele nunca treina nem promove um."""
-    mlflow.set_registry_uri("databricks-uc")
-    uri = f"models:/{catalog}.{schema}.{model_name}@{model_alias}"
-    try:
-        model = mlflow.xgboost.load_model(uri)
-    except Exception as e:
-        raise RuntimeError(
-            f"Não foi possível carregar {uri}. Rode o notebook de treino/registro antes "
-            f"de validar o modelo. Erro original: {e}"
-        ) from e
-    print(f"Modelo carregado do Registry: {uri}")
-    return model
-
-
-def verificar_split_do_champion(
-    catalog: str,
-    schema: str,
-    model_name: str,
-    model_alias: str,
-    auc_recalculada: float,
-    metrica_treino: str = "auc_test",
-    tolerancia: float = 1e-6,
-) -> float:
-    """Compara a AUC recalculada no teste com a registrada no run de treino
-    do @champion. Iguais = o teste de agora é o mesmo do treino (sem
-    vazamento). Diferentes = o split mudou; falha alto."""
-    client = mlflow.MlflowClient(registry_uri="databricks-uc")
-    versao = client.get_model_version_by_alias(f"{catalog}.{schema}.{model_name}", model_alias)
-    metricas = client.get_run(versao.run_id).data.metrics
-    if metrica_treino not in metricas:
-        raise RuntimeError(
-            f"O run de treino da versão {versao.version} não tem a métrica '{metrica_treino}'; "
-            f"não é possível verificar se o split de teste é o mesmo do treino."
-        )
-    auc_treino = float(metricas[metrica_treino])
-    if abs(auc_treino - auc_recalculada) > tolerancia:
-        raise RuntimeError(
-            f"[FALHA] AUC no teste ({auc_recalculada:.6f}) difere da registrada no treino da "
-            f"versão {versao.version} ({auc_treino:.6f}). O split de teste não é o mesmo do treino: "
-            f"parte dos clientes pode ter sido vista pelo modelo e as métricas sairiam otimistas."
-        )
-    print(
-        f"[OK] Split de teste idêntico ao do treino da versão {versao.version} "
-        f"(AUC {auc_recalculada:.6f} = {auc_treino:.6f})."
-    )
-    return auc_treino
+# prepare_train_test, load_champion_model e verificar_split_do_champion vêm de
+# hypothesis_validation (importados acima): um único split e um único modelo
+# para os dois notebooks de validação.
 
 
 # ------------------------------------------------------------------------------
@@ -175,7 +99,10 @@ def compute_shap_ranking(model, X_test: pd.DataFrame):
 def _custo(y_true, y_pred, custo_negar_bom, custo_aprovar_mau) -> dict:
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     return {
-        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
+        "tp": int(tp),
         "custo_total": float(fp * custo_negar_bom + fn * custo_aprovar_mau),
         "taxa_aprovacao": float((tn + fn) / len(y_true)),
     }
@@ -199,8 +126,10 @@ def optimize_threshold_asymmetric(
     df_custos = pd.DataFrame(rows)
     melhor = df_custos.loc[df_custos["custo_total"].idxmin()]
     operacional = _custo(
-        y_test, (y_proba_test >= threshold_operacional).astype(int),
-        custo_negar_bom, custo_aprovar_mau,
+        y_test,
+        (y_proba_test >= threshold_operacional).astype(int),
+        custo_negar_bom,
+        custo_aprovar_mau,
     )
     return {
         "df_custos": df_custos,
@@ -303,11 +232,14 @@ def bias_analysis(
     alertas = []
     for nome, tabela in tabelas.items():
         for _, row in tabela.iterrows():
-            ressalva = " (amostra pequena — interpretar com cautela)" if row["amostra_pequena"] else ""
+            ressalva = (
+                " (amostra pequena — interpretar com cautela)" if row["amostra_pequena"] else ""
+            )
             if row["razao_aprovacao"] < LIMIAR_RAZAO_APROVACAO:
                 alertas.append(
                     f"[{nome}] {row['grupo']}: aprovação {row['taxa_aprovacao']:.1%} = "
-                    f"{row['razao_aprovacao']:.2f} da maior aprovação (< {LIMIAR_RAZAO_APROVACAO}); "
+                    f"{row['razao_aprovacao']:.2f} da maior aprovação "
+                    f"(< {LIMIAR_RAZAO_APROVACAO}); "
                     f"inadimplência real do grupo: {row['inadimplencia_real']:.1%}{ressalva}"
                 )
             if row["bons_negados_acima_da_media"]:
@@ -343,7 +275,11 @@ def calibration_analysis(
         np.arange(len(y)), test_size=0.5, stratify=y, random_state=seed
     )
     iso = IsotonicRegression(out_of_bounds="clip").fit(y_proba_test[idx_cal], y[idx_cal])
-    p_bruta, p_calibrada, y_ava = y_proba_test[idx_ava], iso.predict(y_proba_test[idx_ava]), y[idx_ava]
+    p_bruta, p_calibrada, y_ava = (
+        y_proba_test[idx_ava],
+        iso.predict(y_proba_test[idx_ava]),
+        y[idx_ava],
+    )
 
     def _resumo(p):
         obs, prev = calibration_curve(y_ava, p, n_bins=n_bins, strategy="quantile")
@@ -390,22 +326,20 @@ def compare_with_logistic(
     Mede quanto o XGBoost agrega sobre um modelo mais simples, em vez de
     comparar com 'aprovar todo mundo', política que nenhuma instituição usa.
 
-    A logística segue a definição do baseline do projeto
-    (hypothesis_validation.train_models): imputação pela mediana ajustada
-    no treino, padronização e class_weight="balanced"."""
-    logistica = make_pipeline(
-        SimpleImputer(strategy="median"),
-        StandardScaler(),
-        LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42),
-    ).fit(X_train, y_train)
+    A logística é a mesma do baseline do projeto (train_logreg, em
+    hypothesis_validation)."""
+    logistica = train_logreg(X_train, y_train)
     y_proba_lr = logistica.predict_proba(X_test)[:, 1]
     y = np.asarray(y_test)
 
     linhas = []
     for nome, proba in [("XGBoost (@champion)", y_proba_xgb), ("Regressão logística", y_proba_lr)]:
         linhas.append(
-            {"modelo": nome, "auc": float(roc_auc_score(y, proba)),
-             **_carteira_na_aprovacao(y, proba, taxa_aprovacao)}
+            {
+                "modelo": nome,
+                "auc": float(roc_auc_score(y, proba)),
+                **_carteira_na_aprovacao(y, proba, taxa_aprovacao),
+            }
         )
     return pd.DataFrame(linhas)
 
@@ -438,7 +372,9 @@ def financial_impact(
         "perda_evitada": perda_evitada,
         "custo_oportunidade": custo_oportunidade,
         "impacto_liquido": perda_evitada - custo_oportunidade,
-        "razao_equilibrio_perda_margem": bons_negados / maus_recusados if maus_recusados else np.nan,
+        "razao_equilibrio_perda_margem": bons_negados / maus_recusados
+        if maus_recusados
+        else np.nan,
     }
 
 
@@ -474,12 +410,18 @@ def log_validation_to_mlflow(
                 "brier_bruto": calibration_result["bruta"]["brier"],
                 "brier_calibrado": calibration_result["calibrada"]["brier"],
                 "erro_calibracao_bruto": calibration_result["bruta"]["erro_calibracao_medio"],
-                "erro_calibracao_calibrado": calibration_result["calibrada"]["erro_calibracao_medio"],
+                "erro_calibracao_calibrado": calibration_result["calibrada"][
+                    "erro_calibracao_medio"
+                ],
             }
         )
         mlflow.log_dict(ranking_shap.to_dict(orient="records"), "shap_ranking.json")
-        mlflow.log_dict(bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json")
-        mlflow.log_dict(bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json")
+        mlflow.log_dict(
+            bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json"
+        )
+        mlflow.log_dict(
+            bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json"
+        )
         mlflow.log_dict({"alertas": bias_result["alertas"]}, "alertas_vies.json")
         mlflow.log_dict(comparison.to_dict(orient="records"), "comparacao_logistica.json")
     print("\nValidação concluída e registrada no MLflow.")

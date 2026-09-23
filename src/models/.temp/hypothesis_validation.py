@@ -2,72 +2,42 @@
 # ==============================================================================
 # VALIDAÇÃO DAS HIPÓTESES H1-H4 (ver README.md)
 #
-# Lê da GOLD (fct_credit_profile + dim_customer). Os valores financeiros (H4)
-# vêm de src/config/business_params.py, mesma fonte de Q2/Q4.
-#
-# UM MODELO SÓ: as hipóteses são validadas no @champion registrado no Unity
-# Catalog — o mesmo modelo usado na inferência batch, no monitoramento e na
-# análise de viés. A versão anterior treinava um XGBoost próprio a cada
-# execução (split de 20%, com imputação), então os números do README vinham
-# de um modelo diferente do que ia para produção.
-#
-# UM SPLIT SÓ: `prepare_train_test` reproduz o split de treino do @champion
-# (25%, seed 42, estratificado, dados brutos — o XGBoost trata nulos
-# nativamente, como na inferência). `verificar_split_do_champion` confirma,
-# comparando a AUC recalculada com a registrada no run de treino.
-# bias_roi_validation.py importa estas mesmas funções.
+# Lê da GOLD (fct_credit_profile + dim_customer) — não da Silver — para ficar
+# consistente com o notebook irmão (03_analise_shap_threshold_vies_roi.py),
+# que já lê de lá. Os valores financeiros (H4) e o catálogo não ficam mais
+# hardcoded: vêm de parâmetro, com um único default documentado aqui, para
+# não divergir entre os dois notebooks de novo.
 # ==============================================================================
 
 from dataclasses import dataclass, field
 
-import mlflow
-import mlflow.xgboost
 import numpy as np
 import pandas as pd
 import shap
+from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+
 from src.config.business_params import CUSTO_APROVAR_MAU_PAGADOR, CUSTO_NEGAR_BOM_PAGADOR
 
 TARGET_COL = "target_dlq_2yrs"
 ID_COLS = ["customer_id"]
 
-FEATURE_COLS = [
-    "age",
-    "num_dependents",
-    "monthly_income",
-    "debt_ratio",
-    "revolving_utilization",
-    "num_open_credit_lines",
-    "num_real_estate_loans",
-    "num_times_30_59_days_late",
-    "num_times_60_89_days_late",
-    "num_times_90_days_late",
-    "total_delinquency_events",
-]
-
-# Split do treino do @champion — não alterar sem retreinar e registrar nova versão
-TEST_SIZE = 0.25
-SEED = 42
-
-MODEL_SCHEMA = "gold"
-MODEL_NAME = "credito_risco_xgb"
-MODEL_ALIAS = "champion"
-
 # H4 usa os mesmos nomes de negócio de Q2/Q4 (src/config/business_params.py) —
 # perda_media = custo de aprovar um mau pagador; margem_media = custo de negar
-# um bom pagador.
+# um bom pagador. Antes eram duas constantes com valores diferentes sem motivo.
 PERDA_MEDIA_POR_INADIMPLENCIA_R = CUSTO_APROVAR_MAU_PAGADOR
 MARGEM_MEDIA_POR_CLIENTE_BOM_R = CUSTO_NEGAR_BOM_PAGADOR
 
 
 @dataclass
 class TrainedModels:
-    xgb_model: object
+    xgb_model: XGBClassifier
     logreg_pipeline: Pipeline
     X_test: pd.DataFrame
     y_test: pd.Series
@@ -76,12 +46,9 @@ class TrainedModels:
     feature_names: list = field(default_factory=list)
 
 
-# ------------------------------------------------------------------------------
-# Dados, split e modelo
-# ------------------------------------------------------------------------------
 def load_gold_training_data(spark, catalog: str, schema: str = "gold") -> pd.DataFrame:
-    """Junta fct_credit_profile + dim_customer. Inclui o lote de scoring
-    (alvo nulo); prepare_train_test descarta essas linhas."""
+    """Junta fct_credit_profile + dim_customer — mesma junção que o
+    notebook de viés/ROI já usa."""
     df_spark = spark.sql(f"""
         SELECT
             f.customer_id, c.age, c.num_dependents,
@@ -96,109 +63,75 @@ def load_gold_training_data(spark, catalog: str, schema: str = "gold") -> pd.Dat
     return df_spark.toPandas()
 
 
-def prepare_train_test(df: pd.DataFrame, test_size: float = TEST_SIZE, seed: int = SEED):
-    """Split canônico do projeto: só linhas rotuladas, features explícitas,
-    dados brutos. Reproduz o split de treino do @champion."""
-    faltando = [c for c in FEATURE_COLS + [TARGET_COL] if c not in df.columns]
-    if faltando:
-        raise ValueError(f"Colunas ausentes nos dados de entrada: {faltando}")
+def prepare_train_test(df: pd.DataFrame, test_size: float = 0.20, seed: int = 42):
+    """Descarta linhas sem target, faz split estratificado e imputa nulos
+    (mediana, fit só no treino — sem vazamento)."""
+    target_invalido = df[TARGET_COL].isna() | np.isinf(df[TARGET_COL])
+    df_valid = df[~target_invalido].copy()
 
-    df = df[df[TARGET_COL].notna() & ~np.isinf(df[TARGET_COL])].copy()
-    df[TARGET_COL] = df[TARGET_COL].astype(int)
-    X, y = df[FEATURE_COLS], df[TARGET_COL]
-    return train_test_split(X, y, test_size=test_size, stratify=y, random_state=seed)
+    feature_cols = [c for c in df_valid.columns if c not in ID_COLS + [TARGET_COL]]
+    X = df_valid[feature_cols]
+    y = df_valid[TARGET_COL].astype(int)
 
-
-def load_champion_model(
-    catalog: str,
-    schema: str = MODEL_SCHEMA,
-    model_name: str = MODEL_NAME,
-    model_alias: str = MODEL_ALIAS,
-):
-    """Carrega o modelo do Registry. Falha alto se não conseguir — a
-    validação é do modelo de produção; aqui nunca se treina nem se promove."""
-    mlflow.set_registry_uri("databricks-uc")
-    uri = f"models:/{catalog}.{schema}.{model_name}@{model_alias}"
-    try:
-        model = mlflow.xgboost.load_model(uri)
-    except Exception as e:
-        raise RuntimeError(
-            f"Não foi possível carregar {uri}. Rode o notebook de treino/registro antes "
-            f"de validar o modelo. Erro original: {e}"
-        ) from e
-    print(f"Modelo carregado do Registry: {uri}")
-    return model
-
-
-def verificar_split_do_champion(
-    catalog: str,
-    auc_recalculada: float,
-    schema: str = MODEL_SCHEMA,
-    model_name: str = MODEL_NAME,
-    model_alias: str = MODEL_ALIAS,
-    metrica_treino: str = "auc_test",
-    tolerancia: float = 1e-6,
-) -> float:
-    """Compara a AUC recalculada no teste com a registrada no run de treino
-    do @champion. Iguais = o teste de agora é o mesmo do treino (sem
-    vazamento). Diferentes = o split mudou; falha alto."""
-    client = mlflow.MlflowClient(registry_uri="databricks-uc")
-    versao = client.get_model_version_by_alias(f"{catalog}.{schema}.{model_name}", model_alias)
-    metricas = client.get_run(versao.run_id).data.metrics
-    if metrica_treino not in metricas:
-        raise RuntimeError(
-            f"O run de treino da versão {versao.version} não tem a métrica '{metrica_treino}'; "
-            f"não é possível verificar se o split de teste é o mesmo do treino."
-        )
-    auc_treino = float(metricas[metrica_treino])
-    if abs(auc_treino - auc_recalculada) > tolerancia:
-        raise RuntimeError(
-            f"[FALHA] AUC no teste ({auc_recalculada:.6f}) difere da registrada no treino da "
-            f"versão {versao.version} ({auc_treino:.6f}). "
-            f"O split de teste não é o mesmo do treino: "
-            f"parte dos clientes pode ter sido vista pelo modelo e as métricas sairiam otimistas."
-        )
-    print(
-        f"[OK] Split de teste idêntico ao do treino da versão {versao.version} "
-        f"(AUC {auc_recalculada:.6f} = {auc_treino:.6f})."
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=seed, stratify=y
     )
-    return auc_treino
+
+    preprocessor = ColumnTransformer(
+        transformers=[("impute_median", SimpleImputer(strategy="median"), feature_cols)],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+    X_train_prep = preprocessor.fit_transform(X_train)
+    X_test_prep = preprocessor.transform(X_test)
+    names = list(preprocessor.get_feature_names_out())
+
+    X_train_df = pd.DataFrame(X_train_prep, columns=names, index=X_train.index)
+    X_test_df = pd.DataFrame(X_test_prep, columns=names, index=X_test.index)
+    return X_train_df, X_test_df, y_train, y_test, names
 
 
-def train_logreg(X_train: pd.DataFrame, y_train: pd.Series, seed: int = SEED) -> Pipeline:
-    """Baseline interpretável do projeto (ver README). A imputação pela
-    mediana fica dentro do pipeline, ajustada só no treino."""
-    return Pipeline(
+def train_models(X_train: pd.DataFrame, y_train: pd.Series, seed: int = 42) -> tuple:
+    """XGBoost (principal) + Regressão Logística (baseline interpretável) — ver README."""
+    neg, pos = (y_train == 0).sum(), (y_train == 1).sum()
+    xgb_model = XGBClassifier(
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=4,
+        scale_pos_weight=float(neg / pos),
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=seed,
+        eval_metric="auc",
+    )
+    xgb_model.fit(X_train, y_train)
+
+    logreg_pipeline = Pipeline(
         [
-            ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
             (
                 "logreg",
                 LogisticRegression(class_weight="balanced", max_iter=1000, random_state=seed),
             ),
         ]
-    ).fit(X_train, y_train)
+    )
+    logreg_pipeline.fit(X_train, y_train)
+    return xgb_model, logreg_pipeline
 
 
-def run_validation(spark, catalog: str, schema: str = MODEL_SCHEMA) -> TrainedModels:
-    """Carrega o @champion, reproduz o split do treino (e verifica) e treina
-    só a regressão logística de comparação."""
+def run_training(spark, catalog: str, schema: str = "gold", seed: int = 42) -> TrainedModels:
     df = load_gold_training_data(spark, catalog, schema)
-    X_train, X_test, y_train, y_test = prepare_train_test(df)
+    X_train, X_test, y_train, y_test, feature_names = prepare_train_test(df, seed=seed)
+    xgb_model, logreg_pipeline = train_models(X_train, y_train, seed=seed)
 
-    xgb_model = load_champion_model(catalog, schema)
     y_pred_xgb = xgb_model.predict_proba(X_test)[:, 1]
-    auc_xgb = roc_auc_score(y_test, y_pred_xgb)
-    verificar_split_do_champion(catalog, auc_xgb, schema)
-
-    logreg_pipeline = train_logreg(X_train, y_train)
     y_pred_logreg = logreg_pipeline.predict_proba(X_test)[:, 1]
 
-    print(f"ROC-AUC XGBoost (@champion): {auc_xgb:.4f}")
+    print(f"ROC-AUC XGBoost: {roc_auc_score(y_test, y_pred_xgb):.4f}")
     print(f"ROC-AUC Regressão Logística: {roc_auc_score(y_test, y_pred_logreg):.4f}")
 
     return TrainedModels(
-        xgb_model, logreg_pipeline, X_test, y_test, y_pred_xgb, y_pred_logreg, list(FEATURE_COLS)
+        xgb_model, logreg_pipeline, X_test, y_test, y_pred_xgb, y_pred_logreg, feature_names
     )
 
 
@@ -400,7 +333,7 @@ def build_hypotheses_summary(h1: dict, h2: dict, h3: dict, h4: dict) -> pd.DataF
                     if h4["impacto_liquido"] is not None
                     else "Dependente de H3."
                 ),
-                "limitacao": "Valores de perda/margem são ilustrativos — substituir por dados financeiros reais da instituição.",
+                "limitacao": "Valores de perda/margem são ilustrativos — substituir por dados financeiros reais da Mezzo.",
             },
         ]
     )

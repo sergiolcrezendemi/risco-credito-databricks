@@ -7,9 +7,11 @@
 #   "xgboost>=2.0",
 # ]
 # ///
-# MAGIC %%sh
-# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-# MAGIC uv sync
+# MAGIC %uv sync
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -74,7 +76,8 @@ from src.models.hypothesis_validation import load_gold_training_data
 # MAGIC ## 1. Dados e modelo
 # MAGIC `prepare_train_test` descarta as linhas do lote de scoring (alvo nulo) e usa
 # MAGIC as features explícitas de `FEATURE_COLS`. O split (25%, seed 42, estratificado)
-# MAGIC precisa ser o mesmo do notebook de treino do @champion.
+# MAGIC é o mesmo do treino do @champion; `verificar_split_do_champion` confirma isso
+# MAGIC comparando a AUC recalculada com a registrada no run de treino.
 
 # COMMAND ----------
 
@@ -84,6 +87,13 @@ print(f"Treino: {len(X_train):,} | Teste: {len(X_test):,} | Inadimplência no te
 
 model = brv.load_champion_model(catalog, "gold", MODEL_NAME, MODEL_ALIAS)
 y_proba_test = model.predict_proba(X_test)[:, 1]
+
+# Garante que o teste é o mesmo do treino do @champion (sem vazamento)
+from sklearn.metrics import roc_auc_score
+
+brv.verificar_split_do_champion(
+    catalog, "gold", MODEL_NAME, MODEL_ALIAS, roc_auc_score(y_test, y_proba_test)
+)
 
 # COMMAND ----------
 
