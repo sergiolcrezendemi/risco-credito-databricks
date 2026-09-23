@@ -1,0 +1,7 @@
+1- NO INICIO DE CADA NOTEBOOK QUE PRECISA INSTALAR PACOTES TEM O COMAND '%UV SINC' PRECISA SER COMENTADO PARA QUE NAO DA ERRO DE CONFLITO DE BIBLIOTECAS QUANDO FOR PARA PRODUÇÃO
+
+
+2- quando for colocar no github publico para atender o portifolio deve incluir no .gitignore o caminho
+   *.temp/
+   AWSTemplateFormatVersion: "2010-09-09"
+
