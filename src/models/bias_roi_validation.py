@@ -36,6 +36,8 @@
 #     otimistas — a checagem interrompe a execução antes disso.
 #   - Split, carregamento do @champion, checagem do split e regressão
 #     logística vêm de hypothesis_validation — definidos num só lugar.
+#   - Q3d: experimento sem a variável idade, para medir quanto do viés
+#     etário vem da variável em si e quanto chega por outras variáveis.
 # ==============================================================================
 
 import logging
@@ -44,6 +46,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import shap
+import xgboost as xgb
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import brier_score_loss, confusion_matrix, roc_auc_score
@@ -301,12 +304,17 @@ def calibration_analysis(
 # ------------------------------------------------------------------------------
 # Q3c — XGBoost vs. regressão logística na mesma taxa de aprovação
 # ------------------------------------------------------------------------------
+def _aprovados_na_taxa(proba: np.ndarray, taxa_aprovacao: float) -> np.ndarray:
+    """Máscara dos `taxa_aprovacao` clientes de menor risco previsto."""
+    n_aprovados = int(round(taxa_aprovacao * len(proba)))
+    mascara = np.zeros(len(proba), dtype=bool)
+    mascara[np.argsort(proba, kind="stable")[:n_aprovados]] = True
+    return mascara
+
+
 def _carteira_na_aprovacao(y_true: np.ndarray, proba: np.ndarray, taxa_aprovacao: float) -> dict:
     """Aprova os `taxa_aprovacao` clientes de menor risco previsto."""
-    n_aprovados = int(round(taxa_aprovacao * len(y_true)))
-    aprovados = np.argsort(proba, kind="stable")[:n_aprovados]
-    mascara = np.zeros(len(y_true), dtype=bool)
-    mascara[aprovados] = True
+    mascara = _aprovados_na_taxa(proba, taxa_aprovacao)
     return {
         "inadimplencia_aprovados": float(y_true[mascara].mean()),
         "maus_recusados": int(((~mascara) & (y_true == 1)).sum()),
@@ -342,6 +350,84 @@ def compare_with_logistic(
             }
         )
     return pd.DataFrame(linhas)
+
+
+# ------------------------------------------------------------------------------
+# Q3d — Experimento sem a variável idade
+# ------------------------------------------------------------------------------
+# Hiperparâmetros com que o @champion (versão 1) foi treinado, para que a
+# única diferença entre os dois modelos seja a variável removida.
+HIPERPARAMETROS_CHAMPION = {
+    "n_estimators": 300,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "eval_metric": "auc",
+}
+
+
+def experimento_sem_variavel(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    y_proba_champion: np.ndarray,
+    taxa_aprovacao: float,
+    variavel: str = "age",
+    seed: int = 42,
+) -> dict:
+    """Treina um XGBoost igual ao @champion, mas sem `variavel`, e compara os
+    dois na MESMA taxa de aprovação: desempenho da carteira e taxa de bons
+    pagadores negados por faixa etária.
+
+    Remover a variável não garante remover o viés: outras variáveis podem
+    carregar a mesma informação indiretamente (proxies). O experimento mede
+    quanto do viés de fato cai e quanto de desempenho se perde."""
+    features_sem = [c for c in X_train.columns if c != variavel]
+    y_tr = np.asarray(y_train)
+    modelo_sem = xgb.XGBClassifier(
+        **HIPERPARAMETROS_CHAMPION,
+        scale_pos_weight=float((y_tr == 0).sum() / (y_tr == 1).sum()),
+        random_state=seed,
+    ).fit(X_train[features_sem], y_train)
+    y_proba_sem = modelo_sem.predict_proba(X_test[features_sem])[:, 1]
+
+    y = np.asarray(y_test)
+    faixas = pd.Series(faixa_idade(X_test["age"]).astype(str), index=X_test.index)
+    modelos = {"com idade (@champion)": y_proba_champion, f"sem {variavel}": y_proba_sem}
+
+    resumo, por_faixa = [], {}
+    for nome, proba in modelos.items():
+        recusado = ~_aprovados_na_taxa(proba, taxa_aprovacao)
+        bons = y == 0
+        taxas = (
+            pd.DataFrame({"faixa": faixas.values, "recusado": recusado, "bom": bons})
+            .query("bom")
+            .groupby("faixa", sort=False)["recusado"]
+            .mean()
+        )
+        por_faixa[nome] = taxas
+        resumo.append(
+            {
+                "modelo": nome,
+                "auc": float(roc_auc_score(y, proba)),
+                **_carteira_na_aprovacao(y, proba, taxa_aprovacao),
+                "razao_bons_negados_18_30_vs_60_mais": float(taxas["18-30"] / taxas["60+"]),
+            }
+        )
+
+    ordem = ["18-30", "31-40", "41-50", "51-60", "60+", "não informada"]
+    tabela_faixas = pd.DataFrame(por_faixa).reindex([f for f in ordem if f in faixas.unique()])
+    tabela_faixas.index.name = "faixa_idade"
+    nomes = list(modelos)
+    tabela_faixas["variacao_pp"] = (tabela_faixas[nomes[1]] - tabela_faixas[nomes[0]]) * 100
+
+    return {
+        "resumo": pd.DataFrame(resumo),
+        "bons_negados_por_faixa": tabela_faixas.reset_index(),
+        "y_proba_sem": y_proba_sem,
+    }
 
 
 # ------------------------------------------------------------------------------
@@ -388,6 +474,7 @@ def log_validation_to_mlflow(
     bias_result: dict,
     calibration_result: dict,
     comparison: pd.DataFrame,
+    experimento_sem_idade: dict | None = None,
 ) -> None:
     with mlflow.start_run(run_name="validacao_shap_threshold_vies_roi"):
         mlflow.log_params(
@@ -424,4 +511,13 @@ def log_validation_to_mlflow(
         )
         mlflow.log_dict({"alertas": bias_result["alertas"]}, "alertas_vies.json")
         mlflow.log_dict(comparison.to_dict(orient="records"), "comparacao_logistica.json")
+        if experimento_sem_idade is not None:
+            mlflow.log_dict(
+                experimento_sem_idade["resumo"].to_dict(orient="records"),
+                "experimento_sem_idade_resumo.json",
+            )
+            mlflow.log_dict(
+                experimento_sem_idade["bons_negados_por_faixa"].to_dict(orient="records"),
+                "experimento_sem_idade_por_faixa.json",
+            )
     print("\nValidação concluída e registrada no MLflow.")

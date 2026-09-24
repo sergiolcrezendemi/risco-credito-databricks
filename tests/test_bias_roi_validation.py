@@ -62,3 +62,29 @@ def test_calibracao_isotonica_aproxima_media_prevista_da_observada():
     assert r["bruta"]["media_prevista"] > 3 * r["inadimplencia_observada"]
     assert r["calibrada"]["media_prevista"] == pytest.approx(r["inadimplencia_observada"], abs=0.01)
     assert r["calibrada"]["brier"] < r["bruta"]["brier"]
+
+
+def test_experimento_sem_idade_compara_na_mesma_aprovacao():
+    rng = np.random.default_rng(3)
+    n = 6_000
+    X = pd.DataFrame(
+        {
+            "age": rng.uniform(21, 85, n),
+            "revolving_utilization": rng.uniform(0, 1, n),
+            "monthly_income": rng.lognormal(8.6, 0.6, n),
+        }
+    )
+    logit = -3 + 2.5 * X["revolving_utilization"] - 0.03 * (X["age"] - 50)
+    y = pd.Series(rng.binomial(1, 1 / (1 + np.exp(-logit))))
+    X_tr, X_te, y_tr, y_te = X.iloc[:4_000], X.iloc[4_000:], y.iloc[:4_000], y.iloc[4_000:]
+    proba_champion = 1 / (1 + np.exp(-logit.iloc[4_000:].to_numpy()))
+
+    r = brv.experimento_sem_variavel(X_tr, y_tr, X_te, y_te, proba_champion, taxa_aprovacao=0.75)
+    resumo = r["resumo"].set_index("modelo")
+    assert list(resumo.index) == ["com idade (@champion)", "sem age"]
+    # Mesma taxa de aprovação: os dois recusam o mesmo número de clientes
+    recusados = resumo["maus_recusados"] + resumo["bons_negados"]
+    assert recusados.nunique() == 1
+    # Sem a idade, a diferença entre jovens e idosos nos bons negados diminui
+    razao = resumo["razao_bons_negados_18_30_vs_60_mais"]
+    assert razao["sem age"] < razao["com idade (@champion)"]
