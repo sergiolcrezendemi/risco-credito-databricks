@@ -1,0 +1,8 @@
+
+1
+sincronizar com o pyproject.toml
+
+%uv sync
+dbutils.library.restartPython()
+
+2
