@@ -8,11 +8,11 @@
 #   " xgboost>=2.0",
 # ]
 # ///
-# MAGIC %uv sync
-
-# COMMAND ----------
-
-dbutils.library.restartPython()
+# MAGIC %%sh
+# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# MAGIC # uv sync faz o sincronismo no pyproject.toml da raiz do repo
+# MAGIC
+# MAGIC uv sync
 
 # COMMAND ----------
 
@@ -108,7 +108,7 @@ plt.show()
 h1 = hv.validate_h1(shap_sample, shap_values, shap_importance_df)
 print(f"Variável: {h1['feature']}")
 print(f"Posição no ranking SHAP: {h1['posicao_ranking']}º (|SHAP|: {h1['mean_abs_shap']:.4f})")
-print(f"Correlação Feature vs SHAP: {h1['correlacao']:.4f}")
+print(f"Correlação de Spearman (feature vs. SHAP): {h1['correlacao']:.4f}")
 print(f"Conclusão H1: {h1['status']}")
 
 cor_h1 = COR_CONFIRMADA if h1["status"] == "Confirmada" else COR_ALERTA
@@ -118,7 +118,7 @@ ax.axhline(0, color=COR_BASELINE, linewidth=1, linestyle="--")
 ax.set_xlim(-0.05, 2.0)
 ax.set_xlabel(h1["feature"])
 ax.set_ylabel("Valor SHAP (impacto na previsão)")
-ax.set_title(f"H1 — {h1['feature']} vs. SHAP | correlação = {h1['correlacao']:.3f} | {h1['status']}")
+ax.set_title(f"H1 — {h1['feature']} vs. SHAP | Spearman = {h1['correlacao']:.3f} | {h1['status']}")
 plt.tight_layout()
 plt.show()
 

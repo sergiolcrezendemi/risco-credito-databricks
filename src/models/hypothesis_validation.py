@@ -25,6 +25,7 @@ import mlflow.xgboost
 import numpy as np
 import pandas as pd
 import shap
+from scipy.stats import spearmanr
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
@@ -237,8 +238,18 @@ def validate_h1(
     feature="revolving_utilization",
     corr_threshold=0.05,
 ) -> dict:
-    """H1 — utilização de crédito rotativo. Ver README: correlação feature×SHAP."""
-    corr = float(np.corrcoef(shap_sample[feature], shap_values[:, feature].values)[0, 1])
+    """H1 — utilização de crédito rotativo. Ver README: correlação feature×SHAP.
+
+    Usa Spearman (correlação por postos), não Pearson: a relação esperada é
+    monotônica (mais uso do limite -> mais risco), e a utilização tem
+    outliers extremos (valores na casa dos milhares) que achatam a
+    correlação de Pearson mesmo com a relação claramente crescente. Com
+    Pearson, a H1 oscilava entre 0,07 e 0,05 conforme a amostra — em torno
+    do próprio critério de decisão."""
+    rho = spearmanr(
+        shap_sample[feature], shap_values[:, feature].values, nan_policy="omit"
+    ).statistic
+    corr = float(rho)
     pos = int(shap_importance_df[shap_importance_df["feature"] == feature].index[0] + 1)
     shap_val = float(
         shap_importance_df.loc[shap_importance_df["feature"] == feature, "mean_abs_shap"].values[0]
@@ -250,6 +261,7 @@ def validate_h1(
         "posicao_ranking": pos,
         "mean_abs_shap": shap_val,
         "feature": feature,
+        "metodo": "Spearman",
     }
 
 
@@ -366,7 +378,7 @@ def build_hypotheses_summary(h1: dict, h2: dict, h3: dict, h4: dict) -> pd.DataF
                 "descricao": "Clientes com maior revolving_utilization têm maior probabilidade de inadimplência",
                 "metrica": h1["correlacao"],
                 "status": h1["status"],
-                "evidencia": f"Correlação SHAP-Feature de {h1['correlacao']:.4f}. Posição {h1['posicao_ranking']}º no ranking SHAP.",
+                "evidencia": f"Correlação de Spearman SHAP-Feature de {h1['correlacao']:.4f}. Posição {h1['posicao_ranking']}º no ranking SHAP.",
                 "limitacao": "Não testa o mecanismo causal ('menor folga financeira'), apenas associação via SHAP.",
             },
             {

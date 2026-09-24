@@ -8,11 +8,11 @@
 #   " xgboost>=2.0",
 # ]
 # ///
-# MAGIC %%sh
-# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-# MAGIC # uv sync faz o sincronismo no pyproject.toml da raiz do repo
-# MAGIC
-# MAGIC uv sync
+# MAGIC %uv sync
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -20,12 +20,14 @@
 # MAGIC ```
 # MAGIC  ==============================================================================
 # MAGIC  notebooks/ml/01_hipoteses_h1_h4.py
-# MAGIC  Validação das hipóteses H1-H4 (ver README.md) — treino, SHAP e teste de
-# MAGIC  cada hipótese vivem em src/models/hypothesis_validation.py. Este notebook
-# MAGIC  só orquestra e plota; nenhuma lógica de negócio deve ser adicionada aqui.
+# MAGIC  Validação das hipóteses H1-H4 (ver README.md) no @champion — o mesmo
+# MAGIC  modelo da inferência batch, do monitoramento e da análise de viés.
+# MAGIC  Split, carregamento do modelo, SHAP e teste de cada hipótese vivem em
+# MAGIC  src/models/hypothesis_validation.py. Este notebook só orquestra e plota;
+# MAGIC  nenhuma lógica de negócio deve ser adicionada aqui.
 # MAGIC
 # MAGIC  Complementar a este: notebooks/ml/02_vies_threshold_roi.py (perguntas
-# MAGIC  Q2/Q3 do README — threshold com custo assimétrico e hecagem de viés por
+# MAGIC  Q2/Q3 do README — threshold com custo assimétrico e checagem de viés por
 # MAGIC  idade/renda), que já lê da mesma Gold.
 # MAGIC  ==============================================================================
 # MAGIC
@@ -74,11 +76,14 @@ COR_BASELINE = "#757575"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Treino (XGBoost + Regressão Logística) e SHAP
+# MAGIC ## 1. @champion, split de teste e SHAP
+# MAGIC `run_validation` carrega o @champion do Unity Catalog, reproduz o split de
+# MAGIC treino dele e confirma que é o mesmo (AUC recalculada = AUC registrada no
+# MAGIC treino). A regressão logística é treinada aqui só como baseline de comparação.
 
 # COMMAND ----------
 
-models = hv.run_training(spark, catalog=catalog)
+models = hv.run_validation(spark, catalog=catalog)
 shap_sample, shap_values, shap_importance_df = hv.compute_shap(models)
 logreg_coefs = hv.get_logreg_coefficients(models)
 
