@@ -8,11 +8,11 @@
 #   " xgboost>=2.0",
 # ]
 # ///
-# MAGIC %%sh
-# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-# MAGIC # uv sync faz o sincronismo no pyproject.toml da raiz do repo
-# MAGIC
-# MAGIC uv sync
+# MAGIC %uv sync
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
