@@ -10,26 +10,31 @@
 
 | Indicador | Resultado |
 |---|---|
-| ROC-AUC do modelo principal (XGBoost) | **0,867** (meta ≥ 0,85) — regressão logística: 0,788 |
-| Régua de corte escolhida (threshold) | **0,45** |
-| Taxa de aprovação | 100% → **72,8%** |
-| Inadimplência da carteira aprovada | 6,68% → **1,75%** (queda de ~74%) |
-| Impacto financeiro líquido estimado | **+R$ 14,5 mi** (parâmetros ilustrativos) |
-| Monitoramento pós-deploy | Data drift sobre 101.503 clientes de scoring: 11 de 11 features estáveis (PSI máx. 0,0004). Concept drift: sem falso alarme sem drift e alerta a partir de 25% de intensidade (queda de AUC de 0,054) |
+| ROC-AUC do modelo principal (XGBoost) | **0,866** (meta ≥ 0,85) — regressão logística: 0,790 |
+| Régua de corte (threshold operacional) | **0,45**, a menor inadimplência com pelo menos 70% de aprovação |
+| Taxa de aprovação | 100% → **73,1%** |
+| Inadimplência da carteira aprovada | 6,68% → **1,76%** (queda de ~74%) |
+| Ganho sobre a regressão logística, na mesma aprovação | inadimplência da carteira de **3,08% → 1,76%** |
+| Impacto financeiro | o modelo se paga enquanto um calote custar mais de **4,0x** a margem de um bom cliente (+R$ 18,3 mi com os parâmetros ilustrativos) |
+| Viés por idade | um bom pagador de 18–30 anos é recusado **5,4x** mais que um de 60+ (44,5% contra 8,2%) |
+| Calibração | o score bruto prevê 31,5% de inadimplência média para 6,7% observada; calibrado, 6,7% |
+| Monitoramento | data drift sobre 101.503 clientes de scoring: 11 de 11 features estáveis. Concept drift: sem falso alarme sem mudança e alerta a partir de 25% de intensidade |
 
-**Em uma frase:** o risco é explicado principalmente pelo **comportamento** do cliente (uso do limite e histórico de atrasos), e um corte em 0,45 reduz a inadimplência em ~74% mantendo a aprovação acima do piso de 70%. O peso da idade no modelo exige checagem de viés antes de qualquer uso real.
+**Em uma frase:** o risco é explicado principalmente pelo **comportamento** do cliente (uso do limite e histórico de atrasos), e um corte em 0,45 reduz a inadimplência em ~74% mantendo 73% de aprovação; mas o modelo distribui seus erros de forma desigual entre faixas etárias, e o score precisa ser calibrado antes de ser usado para precificar.
+
+**Um modelo só.** Todos os números deste README vêm do mesmo modelo, o `@champion` (versão 1) registrado no Unity Catalog, avaliado no mesmo conjunto de teste de 37.500 clientes. Os notebooks de validação reproduzem o split de treino e confirmam que ele não mudou: a AUC recalculada precisa ser idêntica à registrada no run de treino, senão a execução é interrompida.
 
 ## Problema de negócio
-Uma instituição financeira precisa decidir, para cada solicitação de crédito, se aprova ou não a operação — e com qual taxa de juros. A decisão precisa ser rápida, consistente entre analistas e defensável em auditoria. O objetivo deste projeto é construir um score de probabilidade de inadimplência que sustente essa decisão de ponta a ponta: da ingestão do dado até um endpoint em produção monitorado.
+Uma instituição financeira precisa decidir, para cada solicitação de crédito, se aprova ou não a operação — e com qual taxa de juros. A decisão precisa ser rápida, consistente entre analistas e defensável em auditoria. O objetivo deste projeto é construir um score de probabilidade de inadimplência que sustente essa decisão de ponta a ponta: da ingestão do dado até a pontuação de clientes novos, com monitoramento.
 
 ## Base de dados
-- **Give Me Some Credit** (Kaggle) — https://www.kaggle.com/c/GiveMeSomeCredit — ~150.000 registros de clientes pessoa física, 10 variáveis explicativas (utilização de crédito rotativo, idade, número de dependentes, histórico de atraso, dívida/renda, entre outras) e variável-alvo `SeriousDlqin2yrs` (1 = inadimplência em 90+ dias nos próximos 2 anos)
-- **SCR.data** (BACEN, dados agregados) — https://dadosabertos.bcb.gov.br/dataset/scr_data — usado como referência externa para comparar a taxa de inadimplência do modelo com a média nacional por segmento, não como dado de treino
+- **Give Me Some Credit** (Kaggle) — https://www.kaggle.com/c/GiveMeSomeCredit — `cs-training.csv` com 150.000 clientes pessoa física, 10 variáveis explicativas e a variável-alvo `SeriousDlqin2yrs` (1 = inadimplência em 90+ dias nos próximos 2 anos); `cs-test.csv` com 101.503 clientes sem rótulo, usado como lote de produção
+- **SCR.data** (BACEN, dados agregados) — https://dadosabertos.bcb.gov.br/dataset/scr_data — referência externa para comparar a taxa de inadimplência do modelo com a média nacional por segmento, não como dado de treino
 
 ## Métrica-alvo
-- **Métrica primária:** AUC-ROC ≥ 0,85 no conjunto de teste (referência de mercado: soluções de topo da competição original Kaggle atingem ~0,86–0,87) — **atingida: 0,867**
-- **Métricas complementares:** KS-statistic (separação entre bons e maus pagadores), recall na classe inadimplente a um nível de precisão definido pelo negócio
-- **Métrica de negócio:** estimativa de redução de inadimplência em R$ comparando a política "com modelo" vs. a política atual (aprovação sem score)
+- **Métrica primária:** AUC-ROC ≥ 0,85 no conjunto de teste (referência de mercado: soluções de topo da competição original atingem ~0,86–0,87) — **atingida: 0,866**
+- **Métricas complementares:** KS-statistic (separação entre bons e maus pagadores) e recall na classe inadimplente a um nível de precisão definido pelo negócio
+- **Métrica de negócio:** redução de inadimplência e impacto em R$ da política "com modelo" contra "aprovar todos" e contra a regressão logística na mesma taxa de aprovação
 
 ## Hipóteses
 
@@ -40,20 +45,20 @@ As quatro hipóteses seguem uma progressão em duas camadas. Não faz sentido de
 
 | Hipótese | Enunciado | Como foi testada | Decisão que sustenta |
 |---|---|---|---|
-| **H1** — Utilização do rotativo | Clientes com maior `revolving_utilization` têm probabilidade significativamente maior de inadimplência, porque uso próximo do limite indica menor folga financeira | Relação entre o valor da feature e seu próprio SHAP value | Confiar ou não no modelo |
+| **H1** — Utilização do rotativo | Clientes com maior `revolving_utilization` têm probabilidade significativamente maior de inadimplência, porque uso próximo do limite indica menor folga financeira | Correlação de Spearman entre o valor da feature e seu próprio SHAP value (critério: > 0,05) | Confiar ou não no modelo |
 | **H2** — Dívida/renda como preditor dominante | `debt_ratio` tem poder preditivo maior que `age` — capacidade de pagamento pesa mais que perfil demográfico | Comparação do \|SHAP\| médio entre `debt_ratio` e `age`, com margem relativa mínima de 10% | Aprovar o modelo em compliance/auditoria |
-| **H3** — Threshold ótimo | Existe um ponto de corte que reduz a inadimplência da carteira aprovada sem derrubar a aprovação abaixo de um piso viável | Varredura de thresholds sobre `y_pred_xgb`, filtrando pelo piso de aprovação (70%, ilustrativo) e escolhendo o de menor inadimplência entre os viáveis | Definir a regra operacional de aprovação |
-| **H4** — Impacto financeiro | O modelo teria evitado mais perdas em R$ do que o custo de rejeitar bons pagadores | Perda evitada (maus rejeitados × custo médio de inadimplência) vs. custo de oportunidade (bons rejeitados × margem média), no threshold de H3 | Aprovar (ou não) o investimento em produção |
+| **H3** — Threshold ótimo | Existe um ponto de corte que reduz a inadimplência da carteira aprovada sem derrubar a aprovação abaixo de um piso viável | Varredura de thresholds, filtrando pelo piso de aprovação (70%, ilustrativo) e escolhendo o de menor inadimplência entre os viáveis | Definir a regra operacional de aprovação |
+| **H4** — Impacto financeiro | O modelo evita mais perdas em R$ do que o custo de rejeitar bons pagadores | Perda evitada (maus recusados × custo médio de inadimplência) vs. custo de oportunidade (bons recusados × margem média), no threshold de H3 | Aprovar (ou não) o investimento em produção |
 
 ## Resultados das hipóteses
 
-Os gráficos abaixo foram gerados no notebook `01_hipoteses_h1_h4`.
+Gráficos gerados no notebook `01_hipoteses_h1_h4`.
 
 ### Importância das variáveis (ranking SHAP)
 
 ![Ranking SHAP](imagens/00_ranking_shap.png)
 
-Duas variáveis dominam com folga: **uso do crédito rotativo** (|SHAP| médio 0,75) e **total de eventos de atraso** (0,68). Depois vem um degrau grande: idade (0,25), número de linhas de crédito abertas (0,20) e dívida/renda (0,15).
+Duas variáveis dominam, praticamente empatadas: **uso do crédito rotativo** (|SHAP| médio 0,72) e **total de eventos de atraso** (0,72). Depois vem um degrau grande: idade (0,24), número de linhas de crédito abertas (0,19), renda (0,16) e dívida/renda (0,15).
 
 **Leitura:** o risco é explicado principalmente pelo comportamento (como o cliente usa o crédito e se já atrasou), e não pelo perfil (renda, dependentes, imóveis).
 
@@ -63,34 +68,34 @@ Duas variáveis dominam com folga: **uso do crédito rotativo** (|SHAP| médio 0
 
 ![H1](imagens/h1_rotativo_shap.png)
 
-Cada ponto é um cliente: eixo horizontal = fração do limite utilizada; eixo vertical = contribuição SHAP para o risco. A relação é praticamente uma escada subindo: uso perto de 0% reduz o risco, por volta de **35–40%** a variável passa a prejudicar e perto de **100% (limite estourado)** o risco dispara.
+Cada ponto é um cliente: eixo horizontal = fração do limite utilizada; eixo vertical = contribuição SHAP para o risco. A relação é uma escada subindo, com **correlação de Spearman de 0,879**: uso perto de 0% reduz o risco, por volta de **35–40%** a variável passa a prejudicar e perto de **100% (limite estourado)** o risco dispara.
 
-**Implicação:** o uso do limite é o alerta mais forte do modelo e pode virar regra operacional — monitorar clientes da carteira que cruzam ~40% e ~90% de uso.
+**Implicação:** o uso do limite é um dos dois alertas mais fortes do modelo e pode virar regra operacional — monitorar clientes da carteira que cruzam ~40% e ~90% de uso.
 
-> **Nota metodológica:** a correlação de Pearson exibida no gráfico (0,071) subestima a relação, porque é distorcida por outliers extremos (há clientes com utilização na casa dos milhares, cortados pelo `xlim` em 2,0). A correlação de Spearman, ou o cálculo restrito ao intervalo 0–1, representa melhor a relação monotônica visível no gráfico.
+> **Nota metodológica:** a primeira versão do teste usava a correlação de Pearson, que é distorcida pelos outliers extremos de utilização (clientes com valores na casa dos milhares, cortados do gráfico). O resultado oscilava em torno do próprio critério: 0,071 numa execução, 0,047 em outra, com a H1 passando e falhando sem nenhuma mudança real. A limitação já estava documentada antes da troca. A Spearman mede a relação crescente pela ordenação dos valores e não é afetada pelos outliers; um teste unitário (`tests/test_hypothesis_validation.py`) reproduz o problema e garante que ele não volte.
 
 ### H2 — Dívida/renda vs. idade ❌ Contrariada
 
 ![H2](imagens/h2_debt_ratio_vs_age.png)
 
-A hipótese era que dívida/renda superaria idade. Deu o contrário: idade (|SHAP| 0,246) pesa **41% a mais** que dívida/renda (0,145).
+A hipótese era que dívida/renda superaria idade. Deu o contrário: o |SHAP| médio de dívida/renda (0,153) fica **37% abaixo** do de idade (0,245); a idade pesa cerca de 1,6 vez mais.
 
 **Implicações:**
 1. **Negócio:** vale mais olhar *como* o cliente usa o crédito (H1) do que o índice de endividamento declarado — renda autodeclarada costuma ser pouco confiável.
-2. **Risco regulatório:** o peso da idade pode gerar tratamento desigual por faixa etária. Isso será verificado no notebook 02 (viés por idade/renda) antes de qualquer uso real.
+2. **Risco regulatório:** o peso da idade pode gerar tratamento desigual por faixa etária. A análise de viés abaixo confirma que isso acontece.
 
 ### H3 — Aprovação vs. inadimplência por threshold ✅ Confirmada
 
 ![H3](imagens/h3_threshold.png)
 
-Linha azul: % de aprovados (eixo esquerdo). Linha vermelha: % de inadimplentes entre os aprovados (eixo direito). Tracejado cinza: piso de aprovação (70%). Pontilhado vermelho: inadimplência sem modelo (6,68%). Linha verde: régua escolhida.
-
 | | Sem modelo | Com modelo (threshold 0,45) |
 |---|---|---|
-| Taxa de aprovação | 100% | 72,8% |
-| Inadimplência da carteira | 6,68% | **1,75%** |
+| Taxa de aprovação | 100% | 73,1% |
+| Inadimplência da carteira | 6,68% | **1,76%** |
 
-**Implicação:** recusando ~27% dos pedidos, a inadimplência cai ~74%. O threshold funciona como botão de estratégia: subir a régua favorece crescimento com mais risco; descer protege caixa. O gráfico mostra o preço de cada escolha.
+**Implicação:** recusando ~27% dos pedidos, a inadimplência cai ~74%. O threshold funciona como botão de estratégia: subir a régua favorece crescimento com mais risco; descer protege caixa.
+
+> O 0,45 é uma nota do modelo, não uma probabilidade de 45%: o score bruto é descalibrado (ver calibração abaixo). A ordenação dos clientes, e portanto a decisão, não depende disso.
 
 ### H4 — Impacto financeiro líquido ✅ Confirmada
 
@@ -98,48 +103,101 @@ Linha azul: % de aprovados (eixo esquerdo). Linha vermelha: % de inadimplentes e
 
 | Componente | Cálculo | Valor |
 |---|---|---|
-| Perda evitada | 1.622 maus pagadores recusados × ~R$ 15 mil | +R$ 24,3 mi |
-| Custo de oportunidade | 6.538 bons pagadores recusados × ~R$ 1,5 mil | –R$ 9,8 mi |
-| **Impacto líquido** | | **+R$ 14,5 mi** |
+| Perda evitada | 2.023 maus pagadores recusados × R$ 15 mil | +R$ 30,3 mi |
+| Custo de oportunidade | 8.052 bons pagadores recusados × R$ 1,5 mil | –R$ 12,1 mi |
+| **Impacto líquido** | | **+R$ 18,3 mi** |
 
 **Implicação:** de cada 5 clientes recusados, só 1 era de fato mau pagador. Mesmo assim o modelo compensa, porque um calote custa ~10 vezes a margem de um bom cliente.
 
-> **Ressalva:** perda e margem são **parâmetros ilustrativos** (`business_params.py`). O valor só vira argumento de investimento com dados financeiros reais; se a razão perda/margem for bem menor que 10:1, o resultado pode encolher bastante.
+**Ponto de equilíbrio:** o modelo se paga sempre que a perda por calote for maior que **4,0 vezes** a margem de um bom cliente (8.052 ÷ 2.023). Essa conclusão não depende dos valores ilustrativos de `business_params.py`: o negócio pode checá-la com os próprios números de perda e margem.
 
 ### Resumo por hipótese
 
 | Hipótese | Conclusão | Status |
 |---|---|---|
-| H1 | O uso do limite é o principal alarme de risco | ✅ Confirmada |
-| H2 | Dívida/renda importa menos que o esperado; o peso da idade precisa de checagem de viés | ❌ Contrariada |
+| H1 | O uso do limite é um dos dois principais alarmes de risco (Spearman 0,879) | ✅ Confirmada |
+| H2 | Dívida/renda importa menos que idade; o peso da idade gera viés mensurável | ❌ Contrariada |
 | H3 | Dá para cortar a inadimplência em ~74% aprovando ~73% dos pedidos | ✅ Confirmada |
-| H4 | O modelo se paga, com a ressalva de que os valores em reais são simulados | ✅ Confirmada |
+| H4 | O modelo se paga enquanto um calote custar mais de 4x a margem de um bom cliente | ✅ Confirmada |
+
+## Viés, calibração e comparação
+
+Gráficos e tabelas do notebook `02_vies_threshold_roi`, no mesmo modelo, teste e threshold operacional das hipóteses.
+
+### Threshold de custo mínimo vs. operacional
+
+![Custo por threshold](imagens/q2_threshold_custo.png)
+
+Minimizando só o custo esperado, o melhor corte seria **0,57**, com 81,5% de aprovação. O threshold operacional (0,45) aprova menos e custa **R$ 484,5 mil a mais** no teste. Esse é o preço da restrição escolhida em H3, e a decisão entre os dois é de negócio: 0,45 prioriza inadimplência baixa na carteira; 0,57, o menor custo total.
+
+### Viés por idade e renda
+
+![Bons pagadores negados por grupo](imagens/q3_vies_bons_negados.png)
+
+| Faixa etária | Clientes | Inadimplência real | Aprovação | Bons pagadores negados (IC 95%) |
+|---|---|---|---|---|
+| 18–30 | 2.676 | 12,0% | 50,1% | **44,5%** (42,5–46,5%) |
+| 31–40 | 5.985 | 9,5% | 58,9% | 36,5% (35,2–37,7%) |
+| 41–50 | 8.745 | 8,5% | 65,8% | 29,6% (28,6–30,6%) |
+| 51–60 | 8.931 | 6,3% | 75,3% | 21,2% (20,4–22,1%) |
+| 60+ | 11.163 | 2,8% | 90,3% | **8,2%** (7,7–8,7%) |
+
+Duas métricas guiam a leitura:
+
+- **Razão de aprovação (regra dos 4/5):** as faixas de 18 a 50 anos ficam abaixo de 0,80 da aprovação da faixa 60+. Parte disso reflete risco real: a inadimplência dos jovens é mais de 4 vezes maior.
+- **Bons pagadores negados:** mede quem paga pelo erro do modelo. Um **bom pagador de 18–30 anos tem 5,4 vezes mais chance de ser recusado** que um de 60+, com intervalos de confiança que não se sobrepõem. No sentido oposto, o modelo aprova 37% dos maus pagadores acima de 60 anos, contra 10% entre os jovens.
+
+Na renda, o padrão é o mesmo, mais leve: 32,8% de bons pagadores negados no quintil de menor renda, contra 17,7% no maior. Os clientes que não informaram renda (~20% da base) formam um grupo próprio e são os mais aprovados (81,5%), com inadimplência real também baixa (5,4%).
+
+**Por que isso não se resolve só com técnica.** Quando dois grupos têm taxas reais de inadimplência muito diferentes, nenhum score consegue ser ao mesmo tempo bem calibrado e ter a mesma taxa de bons pagadores negados nos dois grupos (Kleinberg et al., 2016; Chouldechova, 2017). Reduzir a diferença exige escolher qual critério de justiça priorizar, e esse critério precisa ser definido com as áreas de risco, jurídico e compliance antes de qualquer uso real do modelo.
+
+### Calibração
+
+![Curva de calibração](imagens/q3b_calibracao.png)
+
+| | Inadimplência média prevista | Brier | Erro médio de calibração |
+|---|---|---|---|
+| Score bruto | 31,5% | 0,141 | 0,248 |
+| Calibrado (isotônica) | 6,7% | 0,050 | 0,007 |
+| Observada | 6,7% | | |
+
+O modelo foi treinado com `scale_pos_weight` para compensar o desbalanceamento, o que infla as probabilidades: ele prevê em média 31,5% de inadimplência para uma base com 6,7%. Para aprovar ou negar, isso não importa, porque só a ordenação conta. **Para precificar juros por risco, só o score calibrado serve.** A calibração isotônica foi ajustada em metade do teste e avaliada na outra metade; por ser monotônica, não muda a ordenação dos clientes.
+
+### XGBoost vs. regressão logística na mesma taxa de aprovação
+
+| Modelo | AUC | Inadimplência da carteira aprovada | Maus recusados | Bons recusados |
+|---|---|---|---|---|
+| XGBoost (`@champion`) | 0,866 | **1,76%** | 2.023 | 8.052 |
+| Regressão logística | 0,790 | 3,08% | 1.662 | 8.413 |
+
+Aprovando os mesmos 73,1% dos pedidos, o XGBoost recusa **361 maus pagadores a mais** e **361 bons pagadores a menos**, e a inadimplência da carteira cai de 3,08% para 1,76%. É a comparação que interessa ao negócio: não contra "aprovar todo mundo", política que nenhuma instituição usa, mas contra um modelo mais simples e mais fácil de explicar.
 
 ## Perguntas de investigação
-1. **Quais variáveis têm maior poder preditivo?** → respondida no ranking SHAP e em H1/H2.
-2. **Existe um threshold que equilibra aprovação e inadimplência?** → respondida em H3 (0,45).
-3. **O modelo mantém performance estável entre faixas de renda e idade?** → *em andamento* (notebook 02). Uma execução exploratória anterior sinalizou taxa elevada de bons pagadores negados na faixa 18–30 anos e de maus pagadores aprovados nas faixas 60+ e de renda mais alta; a análise será refeita com o threshold 0,45.
-4. **Qual o impacto financeiro estimado?** → respondida em H4 (+R$ 14,5 mi, ilustrativo).
+1. **Quais variáveis têm maior poder preditivo?** → ranking SHAP, H1 e H2.
+2. **Existe um threshold que equilibra aprovação e inadimplência?** → H3 (0,45) e a comparação com o threshold de custo mínimo (0,57).
+3. **O modelo trata faixas de renda e idade de forma equivalente?** → não: bons pagadores jovens e de menor renda são recusados com frequência bem maior (seção de viés).
+4. **Qual o impacto financeiro estimado?** → H4: ponto de equilíbrio de 4,0x (+R$ 18,3 mi com os parâmetros ilustrativos).
 
 ## Modelo
-- **Modelo principal:** Gradient Boosting (XGBoost) — dado tabular, alvo binário desbalanceado (~6,7% de positivos) e necessidade de capturar interações não lineares entre variáveis financeiras
-- **Modelo de comparação (baseline interpretável):** Regressão Logística — benchmark de interpretabilidade e piso de performance (ROC-AUC 0,788 vs. 0,867 do XGBoost)
-- **Explicabilidade:** SHAP obrigatório para o modelo principal — cada decisão de aprovação/negação precisa ser rastreável até as variáveis que mais pesaram
-- **Tratamento do desbalanceamento:** class weighting ou SMOTE, com decisão documentada de qual técnica foi usada e por quê
+- **Modelo principal:** XGBoost — dado tabular, alvo binário desbalanceado (6,68% de positivos) e interações não lineares entre variáveis financeiras. Registrado no Unity Catalog como `credito_risco_xgb`, versão 1, alias `@champion`
+- **Baseline interpretável:** regressão logística com imputação pela mediana, padronização e `class_weight="balanced"` (AUC 0,790)
+- **Desbalanceamento:** `scale_pos_weight` no XGBoost e `class_weight="balanced"` na logística. Efeito colateral documentado: probabilidades infladas, corrigidas pela calibração
+- **Explicabilidade:** SHAP no modelo principal — cada decisão pode ser rastreada até as variáveis que mais pesaram
+- **Split único e verificado:** 25% de teste, seed 42, estratificado, definido em `src/models/hypothesis_validation.py` e usado pelos dois notebooks de validação
 
 ## Arquitetura no Databricks (pipeline ponta a ponta)
-1. **Bronze** — ingestão via Autoloader do CSV bruto
-2. **Silver** — tratamento de outliers (ex.: idade = 0, utilização de crédito > 10), imputação de nulos, padronização de schema
-3. **Gold / Feature Store** — feature table versionada, pronta para treino
-4. **Treino** — MLflow tracking de experimentos, comparação XGBoost vs. Regressão Logística
-5. **Registro** — MLflow Model Registry no Unity Catalog (`credito_risco_xgb`), com o modelo vencedor promovido pelo alias `@champion`
-6. **Produção** — inferência batch (`03_inferencia_batch.py`) pontuando o lote de scoring (`cs-test.csv`, ~101 mil clientes sem rótulo), que passa pelas mesmas camadas Bronze → Silver → Gold do treino
-7. **Monitoramento** — notebooks de data drift e concept drift, com métricas no MLflow e histórico em tabelas Delta (detalhes abaixo)
-8. **Governança** — Unity Catalog com RBAC controlando quem acessa a feature table e o endpoint
+1. **Bronze** — ingestão incremental via Auto Loader, com tabelas separadas para treino (`cs-training.csv`) e scoring (`cs-test.csv`)
+2. **Silver** — padronização de nomes e tipos e regras de qualidade por quarentena lógica (idade fora de 18–120 e códigos de erro nos atrasos são marcados, não descartados), com MERGE idempotente
+3. **Gold** — modelo estrela (`dim_customer` + `fct_credit_profile`) com treino e scoring na mesma tabela (alvo nulo = lote novo), deslocamento de IDs do scoring e checagem de unicidade
+4. **Treino e registro** — XGBoost registrado no Unity Catalog com a AUC de teste logada no MLflow; o alias `@champion` aponta para a versão em produção
+5. **Validação** — hipóteses, viés, calibração e comparação com a logística no `@champion`, com checagem de que o split de teste é o mesmo do treino
+6. **Produção** — inferência batch (`03_inferencia_batch.py`) pontuando o lote de scoring (101.503 clientes) com o threshold operacional
+7. **Monitoramento** — data drift e concept drift, com métricas no MLflow e histórico em tabelas Delta (detalhes abaixo)
+8. **Governança** — Unity Catalog controlando acesso às tabelas e ao modelo registrado
 
 ## Monitoramento pós-deploy
 
-O monitoramento responde a duas perguntas diferentes, tratadas em notebooks separados em `notebooks/monitoracao/`. A lógica de cálculo fica em `src/monitoring/`, em numpy/pandas puro, e é coberta por testes unitários (`tests/test_data_drift.py` e `tests/test_concept_drift.py`) que rodam sem cluster.
+O monitoramento responde a duas perguntas diferentes, tratadas em notebooks separados em `notebooks/monitoracao/`. A lógica de cálculo fica em `src/monitoring/`, em numpy/pandas puro, e é coberta por testes unitários (`tests/test_data_drift.py`, `tests/test_concept_drift.py` e `tests/test_concept_drift_intensidade.py`) que rodam sem cluster.
 
 | | Data drift | Concept drift |
 |---|---|---|
@@ -185,7 +243,6 @@ Referência: 150.000 clientes de treino. Lote avaliado: 101.503 clientes de scor
 
 O `@champion` (versão 1) foi avaliado em uma referência sintética sem drift (AUC-ROC 0,809) e em seis lotes com intensidades crescentes de drift, 20.000 clientes cada.
 
-<!-- ![Ranking SHAP](imagens/00_ranking_shap.png) -->
 ![Curva de sensibilidade do monitor de concept drift](imagens/concept_drift_sensibilidade.png)
 
 | Intensidade | AUC-ROC do lote | Queda | Alerta |
@@ -204,17 +261,20 @@ O `@champion` (versão 1) foi avaliado em uma referência sintética sem drift (
 ## Limitações assumidas
 - O dado é de 2011 e de clientes americanos — usado como base metodológica, não como fonte de verdade sobre o mercado brasileiro; o cruzamento com o SCR.data contextualiza essa diferença, não a corrige
 - A variável-alvo tem 24 meses de horizonte; decisões de crédito com prazo diferente exigiriam reavaliação do problema
-- Custo de inadimplência, margem e piso de aprovação são parâmetros ilustrativos
-- O peso relevante de `age` no modelo exige análise de viés antes de qualquer uso em decisão real
+- Custo de inadimplência, margem e piso de aprovação são parâmetros ilustrativos; o ponto de equilíbrio (4,0x) é a conclusão que não depende deles
+- O modelo distribui erros de forma desigual por idade e renda (seção de viés); nenhum uso em decisão real antes de um critério de justiça definido com risco, jurídico e compliance
+- O score bruto não é uma probabilidade; qualquer uso para precificação exige a versão calibrada
 - O concept drift só pode ser medido de verdade com rótulos realizados, que chegam com cerca de 24 meses de atraso; até lá, o monitoramento de performance é validado apenas em simulação e o data drift funciona como alerta antecipado
 
 ## Próximos passos
-- [ ] Concluir o notebook 02 (viés por idade e renda) com o threshold 0,45 e avaliar thresholds por segmento
-- [ ] Trocar Pearson por Spearman no teste de H1
-- [ ] Investigar a concentração de valores repetidos em `monthly_income` na camada Silver
+- [ ] Treinar uma versão sem a variável idade e medir o trade-off entre AUC e taxa de bons pagadores negados por faixa (variáveis como número de linhas de crédito podem carregar informação de idade indiretamente)
+- [ ] Definir, com risco, jurídico e compliance, o critério de justiça aceitável e avaliar thresholds por segmento
+- [ ] Registrar o calibrador junto com o modelo e gravar a probabilidade calibrada na inferência batch
+- [ ] Centralizar o threshold operacional em `src/config/business_params.py`, usado pela validação e pela inferência
 - [ ] Tratar features de contagem com muitos zeros no cálculo do PSI (bins por valor distinto em vez de decis) — limitação confirmada na execução real
 - [ ] Criar a tabela `resultados_realizados` para ativar o modo real do concept drift
+- [ ] Investigar a concentração de valores repetidos em `monthly_income` na camada Silver
 - [ ] Avaliar Model Serving para scoring em tempo real, complementando a inferência batch
 
 ## Status
-Em andamento — ingestão (treino e scoring), treino, validação das hipóteses H1–H4, registro do `@champion`, inferência batch, data drift e concept drift (simulado) executados; análise de viés e modo real do concept drift (depende de rótulos realizados) pendentes.
+Ingestão (treino e scoring), registro do `@champion`, validação das hipóteses, análise de viés, calibração, comparação com a logística, inferência batch e monitoramento (data drift e concept drift simulado) executados. Pendentes: mitigação do viés, calibração em produção e modo real do concept drift.
