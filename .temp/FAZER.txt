@@ -10,4 +10,10 @@
       quais as principais perguntas que um especialista pode fazer em um entrevita sobre o projeto?
          (faça uma lista e detalhe de forma didática)
 
+
+---
+link prompt
+      https://claude.ai/chat/45b93070-4973-4dfd-96d2-b136dbaed285
+
+      
          
