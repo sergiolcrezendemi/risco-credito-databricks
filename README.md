@@ -24,6 +24,8 @@
 
 **Um modelo só.** Todos os números deste README vêm do mesmo modelo, o `@champion` (versão 1) registrado no Unity Catalog, avaliado no mesmo conjunto de teste de 37.500 clientes. Os notebooks de validação reproduzem o split de treino e confirmam que ele não mudou: a AUC recalculada precisa ser idêntica à registrada no run de treino, senão a execução é interrompida.
 
+> **Nota metodológica:** essa checagem foi adicionada depois que, durante o desenvolvimento, dois notebooks chegaram a usar versões diferentes do modelo sem que isso aparecesse olhando só a AUC — os números pareciam coerentes, mas vinham de execuções diferentes. A validação do split resolve isso: se o modelo avaliado não for exatamente o `@champion` do run de treino, a execução para.
+
 ## Problema de negócio
 Uma instituição financeira precisa decidir, para cada solicitação de crédito, se aprova ou não a operação — e com qual taxa de juros. A decisão precisa ser rápida, consistente entre analistas e defensável em auditoria. O objetivo deste projeto é construir um score de probabilidade de inadimplência que sustente essa decisão de ponta a ponta: da ingestão do dado até a pontuação de clientes novos, com monitoramento.
 
@@ -211,6 +213,8 @@ O monitoramento responde a duas perguntas diferentes, tratadas em notebooks sepa
 Os limiares são pontos de partida documentados e devem ser calibrados com a área de risco.
 
 **Lote de scoring sem *training-serving skew*.** O `cs-test.csv` do Kaggle (clientes sem rótulo) entra como lote de produção e percorre o mesmo pipeline do treino. As regras da Silver são fixas (faixa de idade, códigos de erro nos atrasos, dependentes nulos), sem parâmetros calculados a partir dos dados, então o scoring recebe exatamente o mesmo tratamento. Na Gold, como os dois arquivos numeram clientes a partir de 1, os IDs do scoring recebem um deslocamento antes da união, e um teste de unicidade impede que a dimensão de clientes descarte registros em silêncio.
+
+> **Nota metodológica:** antes do deslocamento, os IDs de treino e de scoring colidiam em silêncio — um cliente de treino e um de scoring com o mesmo ID viravam um só registro na dimensão, trocando a idade (e demais atributos) entre as duas populações sem gerar nenhum erro. Isso afetava os cerca de 101 mil clientes do lote de scoring. O teste de unicidade garante que a dimensão final tenha exatamente 251.503 clientes, sem colisão.
 
 ### Resultado do data drift
 
