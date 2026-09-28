@@ -31,7 +31,8 @@ src/risco_credito_databricks.egg-info/.temp/__init__.py
 src/risco_credito_databricks.egg-info/.temp/dependency_links.txt
 src/risco_credito_databricks.egg-info/.temp/requires.txt
 src/risco_credito_databricks.egg-info/.temp/top_level.txt
+tests/test_bias_roi_validation.py
 tests/test_concept_drift.py
+tests/test_concept_drift_intensidade.py
 tests/test_data_drift.py
 tests/test_decisao.py
-tests/test_placeholder.py

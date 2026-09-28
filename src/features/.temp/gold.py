@@ -86,14 +86,19 @@ def _read_silver_combined(
 
     df_training = spark.table(training_table)
 
-    try:
-        df_scoring = spark.table(scoring_table)
-    except Exception:
+    # tableExists() é uma chamada de catálogo (não dispara resolução lazy de
+    # schema via Spark Connect), então funciona de forma confiável tanto em
+    # Serverless quanto em cluster clássico — diferente de um try/except em
+    # torno de spark.table(), que pode deixar a exceção escapar se ela só
+    # surgir depois, ao acessar .columns/.schema.
+    if not spark.catalog.tableExists(scoring_table):
         print(
             f"[AVISO] {scoring_table} não encontrada — Gold construída só com o dataset de treino "
             f"(sem lote de scoring para inferência/monitoramento)."
         )
         return df_training
+
+    df_scoring = spark.table(scoring_table)
 
     if "target_default_2yrs" not in df_scoring.columns:
         target_dtype = dict(df_training.dtypes)["target_default_2yrs"]
@@ -111,7 +116,7 @@ def _read_silver_combined(
         )
 
     return df_training.unionByName(df_scoring)
-
+    
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
     """Dimensão de cliente: atributos demográficos, estáveis por customer_id."""

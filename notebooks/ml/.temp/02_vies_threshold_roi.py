@@ -92,7 +92,7 @@ y_proba_test = model.predict_proba(X_test)[:, 1]
 from sklearn.metrics import roc_auc_score
 
 brv.verificar_split_do_champion(
-    catalog, roc_auc_score(y_test, y_proba_test), "gold", MODEL_NAME, MODEL_ALIAS
+    catalog, "gold", MODEL_NAME, MODEL_ALIAS, roc_auc_score(y_test, y_proba_test)
 )
 
 # COMMAND ----------
@@ -240,40 +240,6 @@ print(comparacao.to_string(index=False))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Q3d — Experimento: o mesmo modelo sem a variável idade
-# MAGIC Treina um XGBoost com os mesmos hiperparâmetros do @champion, sem `age`, e
-# MAGIC compara os dois na mesma taxa de aprovação. Mede quanto do viés etário vem da
-# MAGIC variável em si e quanto chega por outras variáveis que carregam informação de
-# MAGIC idade (proxies), e quanto desempenho se perde.
-
-# COMMAND ----------
-
-experimento_sem_idade = brv.experimento_sem_variavel(
-    X_train, y_train, X_test, y_test, y_proba_test,
-    taxa_aprovacao=threshold_result["aprovacao_threshold_operacional"],
-)
-print(experimento_sem_idade["resumo"].to_string(index=False))
-print("\n=== Bons pagadores negados por faixa etária (mesma taxa de aprovação) ===")
-print(experimento_sem_idade["bons_negados_por_faixa"].to_string(index=False))
-
-tabela = experimento_sem_idade["bons_negados_por_faixa"]
-modelos_exp = [c for c in tabela.columns if c not in ("faixa_idade", "variacao_pp")]
-fig, ax = plt.subplots(figsize=(9, 4.5))
-largura = 0.38
-posicoes = range(len(tabela))
-for deslocamento, nome, cor in zip([-largura / 2, largura / 2], modelos_exp, ["#1f4e79", "#e67e22"]):
-    ax.bar([p + deslocamento for p in posicoes], tabela[nome], width=largura, label=nome, color=cor)
-ax.set_xticks(list(posicoes))
-ax.set_xticklabels(tabela["faixa_idade"])
-ax.set_ylabel("Bons pagadores negados")
-ax.set_title("Bons pagadores negados por faixa etária: com e sem a variável idade")
-ax.legend()
-plt.tight_layout()
-plt.show()
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ## Q4 — Impacto financeiro (threshold operacional)
 
 # COMMAND ----------
@@ -298,6 +264,5 @@ print(f"Ponto de equilíbrio: o modelo se paga enquanto a perda por calote for m
 # COMMAND ----------
 
 brv.log_validation_to_mlflow(
-    threshold_result, financial_result, ranking_shap, bias_result, calibration_result, comparacao,
-    experimento_sem_idade,
+    threshold_result, financial_result, ranking_shap, bias_result, calibration_result, comparacao
 )

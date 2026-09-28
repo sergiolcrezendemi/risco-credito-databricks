@@ -1,0 +1,39 @@
+#post
+
+    https://claude.ai/chat/45b93070-4973-4dfd-96d2-b136dbaed285
+
+Treinar um modelo com AUC de 0,866 foi a parte fácil. O difícil foi responder: dá para usar isso para aprovar crédito, e de forma justa?
+
+Concluí um projeto de risco de crédito ponta a ponta no Databricks, com a base pública Give Me Some Credit, do Kaggle. Alguns aprendizados:
+
+📉 Comportamento pesa mais que perfil. Uso do limite e histórico de atrasos dominam o modelo.
+
+🎚️ O threshold é decisão de negócio. Com corte em 0,45, a inadimplência da carteira caiu de 6,7% para 1,76%, com 73% de aprovação. Na mesma aprovação, uma regressão logística deixaria a carteira com 3,08%.
+
+💰 O modelo se paga enquanto um calote custar mais de 4x a margem de um bom cliente. Um ponto de equilíbrio que o negócio pode checar com os próprios números.
+
+⚖️ O achado mais importante foi o viés. Uma hipótese minha estava errada: a idade pesou 1,6x mais que dívida/renda. Na análise de viés, um bom pagador de 18 a 30 anos é recusado 5,4 vezes mais que um acima de 60. Parte é risco real, mas zerar essa diferença é matematicamente impossível sem abrir mão de outro critério de justiça. É uma decisão de negócio, jurídico e compliance, não só técnica.
+
+🎯 O score não é uma probabilidade. O modelo previa 31,5% de inadimplência média para uma base com 6,7%. Para aprovar, tanto faz; para precificar juros, só a versão calibrada serve.
+
+📡 Monitoramento testado nos dois sentidos: nenhum alarme num lote real de 101 mil clientes sem drift, e alerta disparando quando simulei mudanças.
+
+🔍 O que mais aprendi veio dos erros. Os IDs de treino e de scoring colidiam em silêncio e trocavam a idade de 100 mil clientes. Uma hipótese passava e falhava entre execuções por causa de outliers. E, por um tempo, o projeto apresentava dois modelos diferentes como se fossem um só. Nada disso aparece olhando só a AUC.
+
+Repositório: [link]
+
+#DataScience #RiscoDeCredito #Databricks #MLOps #MachineLearning
+
+
+#pdf para anexar
+vide arquivo no diretorio
+
+
+
+#observar
+
+Troquei o detalhe sobre Pearson vs. Spearman pelos dois erros encontrados no pipeline. Eles mostram experiência de produção, que é o que mais pesa para vaga sênior. O detalhe do Pearson continua na página 3 do carrossel.
+
+Antes de publicar, confira se o repositório já tem o README atualizado e as imagens na pasta imagens/. Quem clicar no link vai direto para lá.
+
+

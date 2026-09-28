@@ -8,5 +8,5 @@ data/processed/
 .databrickscfg
 .env
 *.pem
-.temp_del*/
+*.temp_del*/
 *.egg-info/
