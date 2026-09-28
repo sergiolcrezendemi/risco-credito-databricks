@@ -1,6 +1,8 @@
 # Databricks notebook source
-%python
-# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # =============================================================================
 # notebooks/monitoracao/01_drift_dados.py
 # -----------------------------------------------------------------------------
@@ -23,14 +25,16 @@
 # =============================================================================
 
 # COMMAND ----------
+
 # =========================
 # 0. CONFIGURAÇÃO
 # =========================
 import logging
+from datetime import datetime, timezone
+
+import mlflow
 import numpy as np
 import pandas as pd
-import mlflow
-from datetime import datetime, timezone
 from scipy.stats import ks_2samp
 
 logging.getLogger("mlflow").setLevel(logging.ERROR)
@@ -46,9 +50,17 @@ OUTPUT_TABLE = f"{CATALOG}.ml.monitoramento_drift_dados"
 MONITORING_EXPERIMENT = "/Shared/credito_risco_monitoramento"
 
 FEATURE_COLS = [
-    "age", "num_dependents", "monthly_income", "debt_ratio", "revolving_utilization",
-    "num_open_credit_lines", "num_real_estate_loans", "num_times_30_59_days_late",
-    "num_times_60_89_days_late", "num_times_90_days_late", "total_delinquency_events",
+    "age",
+    "num_dependents",
+    "monthly_income",
+    "debt_ratio",
+    "revolving_utilization",
+    "num_open_credit_lines",
+    "num_real_estate_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "total_delinquency_events",
 ]
 
 PSI_MODERADO = 0.10
@@ -57,6 +69,35 @@ PSI_SEVERO = 0.25
 mlflow.set_experiment(MONITORING_EXPERIMENT)
 
 # COMMAND ----------
+
+# =========================
+# 0b. IMPORT DA LÓGICA TESTÁVEL (src/) — coberta por tests/test_data_drift.py
+# =========================
+import os
+import sys
+
+
+def _find_repo_root(start: str) -> str:
+    path = start
+    for _ in range(6):
+        if os.path.isdir(os.path.join(path, "src")):
+            return path
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    raise RuntimeError(f"Não encontrei a pasta 'src' subindo a partir de {start}.")
+
+
+repo_root = _find_repo_root(os.getcwd())
+if repo_root not in sys.path:
+    sys.path.append(repo_root)
+
+from src.monitoring.data_drift import calcular_psi, classificar_psi
+
+
+# COMMAND ----------
+
 # =========================
 # 1. CARREGA REFERÊNCIA (treino) E LOTE ATUAL (scoring)
 # =========================
@@ -72,6 +113,7 @@ def carregar(where_target_nulo: bool) -> pd.DataFrame:
     """)
     return df_spark.toPandas()
 
+
 df_referencia = carregar(where_target_nulo=False)
 df_atual = carregar(where_target_nulo=True)
 
@@ -81,45 +123,12 @@ if df_referencia.empty or df_atual.empty:
         f"vazios — nada a comparar. Rode 03_inferencia_batch.py primeiro se o lote atual estiver vazio."
     )
 
-print(f"Referência (treino): {len(df_referencia)} linhas | Lote atual (scoring): {len(df_atual)} linhas")
+print(
+    f"Referência (treino): {len(df_referencia)} linhas | Lote atual (scoring): {len(df_atual)} linhas"
+)
 
 # COMMAND ----------
-# =========================
-# 2. FUNÇÕES DE DRIFT — PSI e KS, reaproveitáveis por feature
-# =========================
-def calcular_psi(referencia: np.ndarray, atual: np.ndarray, n_bins: int = 10) -> float:
-    """PSI clássico: bins definidos pelos DECIS da referência, comparando a
-    proporção de cada bin entre referência e atual. Soma zero só quando as
-    duas distribuições são idênticas nos mesmos cortes."""
-    referencia = referencia[~np.isnan(referencia)]
-    atual = atual[~np.isnan(atual)]
-    if len(referencia) == 0 or len(atual) == 0:
-        return float("nan")
 
-    quantis = np.linspace(0, 1, n_bins + 1)
-    cortes = np.unique(np.quantile(referencia, quantis))
-    if len(cortes) < 3:
-        # Feature quase constante na referência (poucos valores distintos) — PSI não é informativo
-        return 0.0
-    cortes[0], cortes[-1] = -np.inf, np.inf
-
-    freq_ref, _ = np.histogram(referencia, bins=cortes)
-    freq_atual, _ = np.histogram(atual, bins=cortes)
-
-    prop_ref = np.clip(freq_ref / freq_ref.sum(), 1e-4, None)
-    prop_atual = np.clip(freq_atual / freq_atual.sum(), 1e-4, None)
-
-    return float(np.sum((prop_atual - prop_ref) * np.log(prop_atual / prop_ref)))
-
-
-def classificar_psi(psi: float) -> str:
-    if psi >= PSI_SEVERO:
-        return "SEVERO"
-    if psi >= PSI_MODERADO:
-        return "moderado"
-    return "estavel"
-
-# COMMAND ----------
 # =========================
 # 3. CALCULA PSI + KS PARA CADA FEATURE
 # =========================
@@ -136,13 +145,20 @@ for feature in FEATURE_COLS:
     ref_validos = ref_vals[~np.isnan(ref_vals)]
     atual_validos = atual_vals[~np.isnan(atual_vals)]
     ks_stat, ks_pvalue = (
-        ks_2samp(ref_validos, atual_validos) if len(ref_validos) and len(atual_validos) else (float("nan"), float("nan"))
+        ks_2samp(ref_validos, atual_validos)
+        if len(ref_validos) and len(atual_validos)
+        else (float("nan"), float("nan"))
     )
 
-    linhas_resultado.append({
-        "feature": feature, "psi": psi, "classificacao_psi": classificacao,
-        "ks_statistic": float(ks_stat), "ks_pvalue": float(ks_pvalue),
-    })
+    linhas_resultado.append(
+        {
+            "feature": feature,
+            "psi": psi,
+            "classificacao_psi": classificacao,
+            "ks_statistic": float(ks_stat),
+            "ks_pvalue": float(ks_pvalue),
+        }
+    )
     if classificacao == "SEVERO":
         alertas_severos.append(feature)
 
@@ -156,6 +172,7 @@ else:
     print("\nNenhuma feature com drift severo neste lote.")
 
 # COMMAND ----------
+
 # =========================
 # 4. LOGA NO MLFLOW E PERSISTE HISTÓRICO
 # =========================
