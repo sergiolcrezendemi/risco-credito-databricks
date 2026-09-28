@@ -16,4 +16,27 @@ link prompt
       https://claude.ai/chat/45b93070-4973-4dfd-96d2-b136dbaed285
 
       
-         
+
+---
+validar 
+   https://claude.ai/chat/558c3a92-8853-4e68-97ab-f945f0922fd8
+
+   1- testar manualmente a monitoraçao e drift/02_concept_drift   - base treino e teste
+
+         Ordem para testar no dev
+            01_drift_dados com base_atual=training: PSI 0.
+            01_drift_dados com base_atual=training_amostra: estável.
+            01_drift_dados com base_atual=scoring: drift real.
+            02_concept_drift com modo=simulacao: alerta.
+            02_concept_drift com modo=treino_amostra: sem alerta.
+
+   2- criar o job para testar a monitoração (teste e treino) em dev
+
+   3- subir os arquivos para homologação e produção no github     
+         verificar git action
+
+   4- criar job de monitoração em  homologação e produção
+   
+   5- testar novos dados em homologação 
+   
+   6- testar novos dados em produção
