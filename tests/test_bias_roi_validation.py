@@ -43,7 +43,9 @@ def test_ponto_de_equilibrio_do_impacto_financeiro():
 def test_alerta_de_bons_negados_so_quando_o_grupo_e_de_fato_prejudicado():
     rng = np.random.default_rng(0)
     n = 4000
-    X = pd.DataFrame({"age": rng.choice([25, 45, 65], n), "monthly_income": rng.uniform(1e3, 1e4, n)})
+    X = pd.DataFrame(
+        {"age": rng.choice([25, 45, 65], n), "monthly_income": rng.uniform(1e3, 1e4, n)}
+    )
     y = pd.Series(rng.binomial(1, 0.07, n))
     proba = rng.uniform(0, 0.4, n)
     # Bons pagadores de 18-30 recebem score alto: o modelo os recusa muito mais

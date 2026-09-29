@@ -60,7 +60,7 @@ O próximo passo de maior valor é checar a calibração do seu modelo atual, j�
 
 
 ---
-como você levantou as hipoteses e perguntas para o projeto risco_credito_databricks. 
+como você levantou as hipoteses e perguntas para o projeto risco_credito_databricks.
 Como deveria ter pensado para poder chegar a melhor hipotese e pergunta
 Seja bem didatico para um leigo , mostre o passo a passo
 
@@ -204,4 +204,3 @@ A taxa de juros entra no escopo?
 Qual é a meta de sucesso em R$ e a aprovação mínima aceitável?
 Quem valida as premissas financeiras (Finanças, Risco)?
 Existe restrição regulatória ou de auditoria que mude a escolha entre XGBoost e logística?
-

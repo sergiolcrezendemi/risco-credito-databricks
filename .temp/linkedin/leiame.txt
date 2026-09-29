@@ -35,5 +35,3 @@ vide arquivo no diretorio
 Troquei o detalhe sobre Pearson vs. Spearman pelos dois erros encontrados no pipeline. Eles mostram experiência de produção, que é o que mais pesa para vaga sênior. O detalhe do Pearson continua na página 3 do carrossel.
 
 Antes de publicar, confira se o repositório já tem o README atualizado e as imagens na pasta imagens/. Quem clicar no link vai direto para lá.
-
-

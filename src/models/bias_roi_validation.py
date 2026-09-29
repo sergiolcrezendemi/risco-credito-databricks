@@ -51,6 +51,7 @@ from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import brier_score_loss, confusion_matrix, roc_auc_score
 from sklearn.model_selection import train_test_split
+
 from src.config.business_params import (
     CUSTO_APROVAR_MAU_PAGADOR,
     CUSTO_NEGAR_BOM_PAGADOR,

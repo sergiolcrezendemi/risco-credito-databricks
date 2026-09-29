@@ -35,4 +35,6 @@ tests/test_bias_roi_validation.py
 tests/test_concept_drift.py
 tests/test_concept_drift_intensidade.py
 tests/test_data_drift.py
+tests/test_data_drift_contagens.py
 tests/test_decisao.py
+tests/test_hypothesis_validation.py

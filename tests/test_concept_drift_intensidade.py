@@ -3,7 +3,6 @@ Testes do parâmetro `intensidade` de gerar_lote_sintetico.
 Complementam tests/test_concept_drift.py — rodam sem cluster (pytest puro).
 """
 
-import numpy as np
 import pytest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score

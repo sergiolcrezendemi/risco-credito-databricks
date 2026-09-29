@@ -116,7 +116,7 @@ def _read_silver_combined(
         )
 
     return df_training.unionByName(df_scoring)
-    
+
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
     """Dimensão de cliente: atributos demográficos, estáveis por customer_id."""

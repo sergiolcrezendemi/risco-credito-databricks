@@ -1,4 +1,4 @@
-## perguntas 
+## perguntas
 
 Sim, no mercado de dados existe um conjunto padronizado de perguntas essenciais — frequentemente chamado de Machine Learning Project Canvas ou Discovery de Negócio — que serve para praticamente qualquer iniciativa de Machine Learning antes de escrever uma única linha de código.
 
@@ -55,43 +55,43 @@ Quem é o responsável de negócio (product owner / comitê) que valida e aprova
 
 ## diante das informações disponibilizadas quais perguntas o cientista deve fazer para o cliente
 
-Para viabilizar a modelagem e garantir aderência aos requisitos de risco, auditoria e arquitetura, o cientista de dados deve fazer as seguintes perguntas ao cliente:   
+Para viabilizar a modelagem e garantir aderência aos requisitos de risco, auditoria e arquitetura, o cientista de dados deve fazer as seguintes perguntas ao cliente:
 Desconhecido
 
 Impacto Financeiro e Políticas de Crédito
 
-Qual é o volume financeiro médio concedido por operação e qual é a perda financeira média em R$ gerada por inadimplentes na política atual?   
+Qual é o volume financeiro médio concedido por operação e qual é a perda financeira média em R$ gerada por inadimplentes na política atual?
 Desconhecido
 
-Qual é a taxa de aprovação atual da carteira e qual o limite máximo aceitável de perda ou inadimplência?   
+Qual é a taxa de aprovação atual da carteira e qual o limite máximo aceitável de perda ou inadimplência?
 Desconhecido
 
-Qual é a regra atual para atrelar o risco à taxa de juros praticada?   
+Qual é a regra atual para atrelar o risco à taxa de juros praticada?
 Desconhecido
 
-Existem regras duras de corte pré-modelo que reprovam solicitações antes do cálculo do score (como faixas de idade específicas fora de 18 a 115 anos)?   
+Existem regras duras de corte pré-modelo que reprovam solicitações antes do cálculo do score (como faixas de idade específicas fora de 18 a 115 anos)?
 Desconhecido
 
 Conformidade e Auditoria
 
-O comitê de auditoria exige explicabilidade linear direta (como scorecards baseados em WoE e Regressão Logística) ou aceita modelos de gradiente (LightGBM/XGBoost) explicados por SHAP values?   
+O comitê de auditoria exige explicabilidade linear direta (como scorecards baseados em WoE e Regressão Logística) ou aceita modelos de gradiente (LightGBM/XGBoost) explicados por SHAP values?
 Desconhecido
 
-É obrigatório retornar e armazenar na decisão os motivos individuais de recusa para cada cliente reprovado?   
+É obrigatório retornar e armazenar na decisão os motivos individuais de recusa para cada cliente reprovado?
 Desconhecido
 
 Dados e Engenharia de Produção
 
-Como o negócio interpreta e trata operacionalmente clientes com renda ausente (monthly_income nulo) no processo manual?   
+Como o negócio interpreta e trata operacionalmente clientes com renda ausente (monthly_income nulo) no processo manual?
 Desconhecido
 
-Os registros com atrasos marcados com códigos atípicos (valores ≥ 96) representam erros de preenchimento, perda de contato ou clientes renegociados?   
+Os registros com atrasos marcados com códigos atípicos (valores ≥ 96) representam erros de preenchimento, perda de contato ou clientes renegociados?
 Desconhecido
 
-Qual é a latência máxima (SLA em milissegundos) permitida para a chamada do endpoint de decisão em produção?   
+Qual é a latência máxima (SLA em milissegundos) permitida para a chamada do endpoint de decisão em produção?
 Desconhecido
 
-O pipeline na camada Databricks Silver/Gold atualiza os dados em batch ou processa transações quase em tempo real?   
+O pipeline na camada Databricks Silver/Gold atualiza os dados em batch ou processa transações quase em tempo real?
 Desconhecido
 
 Deseja aprofundar em algum desses blocos para preparar a reunião de alinhamento com a equipe de risco?

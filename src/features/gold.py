@@ -147,7 +147,7 @@ def _read_silver_combined(
         )
 
     return df_combined
-    
+
 
 def build_dim_customer(df_silver: DataFrame) -> DataFrame:
     """Dimensão de cliente: atributos demográficos, estáveis por customer_id."""

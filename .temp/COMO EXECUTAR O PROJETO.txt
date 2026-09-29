@@ -3,7 +3,7 @@
 ```
 fluxo para a carga inicial
 
-1- executar o job: job-ingestao 
+1- executar o job: job-ingestao
 
   manual:
      /notebooks/ingestao/01_bronze
@@ -12,8 +12,8 @@ fluxo para a carga inicial
 
   produtivo - via job
       job-ingestao
- 
-2- rodar o modelo produtivo  
+
+2- rodar o modelo produtivo
   manual:
       hipotese|pergunta
           /notebooks/ml/01_hipoteses-h1_h4
@@ -23,7 +23,7 @@ fluxo para a carga inicial
   produtivo - via job:
     ???
 
-3- rodar a monitoração 
+3- rodar a monitoração
   manual:
     /notebooks/monitoracao/01_drift_dados
                            02_concept_drift
@@ -32,7 +32,7 @@ fluxo para a carga inicial
                     data_drift
 - produtivo - via job:
 
-    ???    
+    ???
 
 
 não tem no projeto
@@ -65,11 +65,8 @@ fluxo para a carga de novos dados
 
 
    rode os testes (opcional, mas recomendado): abra o test_bias_roi_validation.py e clique em Run tests. Os 6 devem passar. Se algum falhar, me mande a mensagem antes de seguir.
-   
+
    Rode o notebook 02_vies_threshold_roi com "Run all". Confira se o widget threshold_operacional está em 0.45.
 
-  
+
 ```
-
-
-

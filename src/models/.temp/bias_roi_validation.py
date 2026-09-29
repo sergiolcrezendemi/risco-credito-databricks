@@ -175,7 +175,10 @@ def compute_shap_ranking(model, X_test: pd.DataFrame):
 def _custo(y_true, y_pred, custo_negar_bom, custo_aprovar_mau) -> dict:
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     return {
-        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
+        "tp": int(tp),
         "custo_total": float(fp * custo_negar_bom + fn * custo_aprovar_mau),
         "taxa_aprovacao": float((tn + fn) / len(y_true)),
     }
@@ -199,8 +202,10 @@ def optimize_threshold_asymmetric(
     df_custos = pd.DataFrame(rows)
     melhor = df_custos.loc[df_custos["custo_total"].idxmin()]
     operacional = _custo(
-        y_test, (y_proba_test >= threshold_operacional).astype(int),
-        custo_negar_bom, custo_aprovar_mau,
+        y_test,
+        (y_proba_test >= threshold_operacional).astype(int),
+        custo_negar_bom,
+        custo_aprovar_mau,
     )
     return {
         "df_custos": df_custos,
@@ -303,7 +308,9 @@ def bias_analysis(
     alertas = []
     for nome, tabela in tabelas.items():
         for _, row in tabela.iterrows():
-            ressalva = " (amostra pequena — interpretar com cautela)" if row["amostra_pequena"] else ""
+            ressalva = (
+                " (amostra pequena — interpretar com cautela)" if row["amostra_pequena"] else ""
+            )
             if row["razao_aprovacao"] < LIMIAR_RAZAO_APROVACAO:
                 alertas.append(
                     f"[{nome}] {row['grupo']}: aprovação {row['taxa_aprovacao']:.1%} = "
@@ -343,7 +350,11 @@ def calibration_analysis(
         np.arange(len(y)), test_size=0.5, stratify=y, random_state=seed
     )
     iso = IsotonicRegression(out_of_bounds="clip").fit(y_proba_test[idx_cal], y[idx_cal])
-    p_bruta, p_calibrada, y_ava = y_proba_test[idx_ava], iso.predict(y_proba_test[idx_ava]), y[idx_ava]
+    p_bruta, p_calibrada, y_ava = (
+        y_proba_test[idx_ava],
+        iso.predict(y_proba_test[idx_ava]),
+        y[idx_ava],
+    )
 
     def _resumo(p):
         obs, prev = calibration_curve(y_ava, p, n_bins=n_bins, strategy="quantile")
@@ -404,8 +415,11 @@ def compare_with_logistic(
     linhas = []
     for nome, proba in [("XGBoost (@champion)", y_proba_xgb), ("Regressão logística", y_proba_lr)]:
         linhas.append(
-            {"modelo": nome, "auc": float(roc_auc_score(y, proba)),
-             **_carteira_na_aprovacao(y, proba, taxa_aprovacao)}
+            {
+                "modelo": nome,
+                "auc": float(roc_auc_score(y, proba)),
+                **_carteira_na_aprovacao(y, proba, taxa_aprovacao),
+            }
         )
     return pd.DataFrame(linhas)
 
@@ -438,7 +452,9 @@ def financial_impact(
         "perda_evitada": perda_evitada,
         "custo_oportunidade": custo_oportunidade,
         "impacto_liquido": perda_evitada - custo_oportunidade,
-        "razao_equilibrio_perda_margem": bons_negados / maus_recusados if maus_recusados else np.nan,
+        "razao_equilibrio_perda_margem": bons_negados / maus_recusados
+        if maus_recusados
+        else np.nan,
     }
 
 
@@ -474,12 +490,18 @@ def log_validation_to_mlflow(
                 "brier_bruto": calibration_result["bruta"]["brier"],
                 "brier_calibrado": calibration_result["calibrada"]["brier"],
                 "erro_calibracao_bruto": calibration_result["bruta"]["erro_calibracao_medio"],
-                "erro_calibracao_calibrado": calibration_result["calibrada"]["erro_calibracao_medio"],
+                "erro_calibracao_calibrado": calibration_result["calibrada"][
+                    "erro_calibracao_medio"
+                ],
             }
         )
         mlflow.log_dict(ranking_shap.to_dict(orient="records"), "shap_ranking.json")
-        mlflow.log_dict(bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json")
-        mlflow.log_dict(bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json")
+        mlflow.log_dict(
+            bias_result["tabela_idade"].to_dict(orient="records"), "vies_por_idade.json"
+        )
+        mlflow.log_dict(
+            bias_result["tabela_renda"].to_dict(orient="records"), "vies_por_renda.json"
+        )
         mlflow.log_dict({"alertas": bias_result["alertas"]}, "alertas_vies.json")
         mlflow.log_dict(comparison.to_dict(orient="records"), "comparacao_logistica.json")
     print("\nValidação concluída e registrada no MLflow.")

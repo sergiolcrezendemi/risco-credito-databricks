@@ -32,6 +32,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
 from src.config.business_params import CUSTO_APROVAR_MAU_PAGADOR, CUSTO_NEGAR_BOM_PAGADOR
 
 TARGET_COL = "target_dlq_2yrs"
