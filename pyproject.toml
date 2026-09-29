@@ -23,6 +23,7 @@ environment_version = "5"
 line-length = 100
 target-version = "py311"
 extend-exclude = ["**/.temp"]
+lint.ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "notebooks/**/*.py" = ["F821", "E402"]

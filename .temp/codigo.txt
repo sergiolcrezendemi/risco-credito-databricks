@@ -6,3 +6,10 @@ sincronizar com o pyproject.toml
 dbutils.library.restartPython()
 
 2
+pyproject.toml
+exclude = [
+    "notebooks/**",
+    ".temp/**",
+]
+
+3
