@@ -76,7 +76,7 @@ jobs:
     environment: prd
     steps:
       - uses: actions/checkout@v4
-      - uses: databricks/setup-cli@v0.2
+      - uses: databricks/setup-cli@v0.2.0
       - name: Deploy Asset Bundle em PRD
         run: databricks bundle deploy -t prd
         env:
