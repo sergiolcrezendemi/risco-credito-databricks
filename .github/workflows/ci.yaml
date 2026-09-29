@@ -5,6 +5,7 @@ on:
     branches: [develop, main]
   push:
     branches: [develop, main]
+  workflow_dispatch:
 
 jobs:
   lint-and-test:
@@ -39,36 +40,28 @@ jobs:
             pipeline:
               - 'notebooks/ingestao/**'
               - 'notebooks/ml/**'
+              - 'notebooks/monitoracao/**'
               - 'src/ingestion/**'
               - 'src/features/**'
               - 'src/models/**'
-            # 'retreino' removido por enquanto -- não existe mais um notebook
-            # de treino separado (02_treino_modelo.py); o treino acontece
-            # dentro de notebooks/ml/01_hipoteses_h1_h4.py e
-            # 02_vies_threshold_roi.py, cobertos pelo filtro 'pipeline'
-            # acima. Se um job de retreino dedicado for criado no futuro
-            # (ver docs/roteiro-execucao.md, seção "Em construção"),
-            # reintroduzir o filtro aqui apontando para o notebook real.
 
   deploy-hml:
-    # So roda deploy se algo relevante mudou -- README, CHANGELOG, docs/*,
-    # .env.example etc. nao disparam nada aqui
     if: >
-      github.ref == 'refs/heads/develop' && github.event_name == 'push' &&
-      needs.detect-changes.outputs.relevante == 'true'
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push' && needs.detect-changes.outputs.relevante == 'true') ||
+      github.event_name == 'workflow_dispatch'
     needs: detect-changes
     runs-on: ubuntu-latest
     environment: hml
     steps:
       - uses: actions/checkout@v4
-      - uses: databricks/setup-cli@main
+      - uses: databricks/setup-cli@v0.2
       - name: Deploy Asset Bundle em HML
         run: databricks bundle deploy -t hml
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      - name: Rodar pipeline (se algo em ingestão/ml mudou)
-        if: needs.detect-changes.outputs.pipeline == 'true'
+      - name: Rodar pipeline (se algo em ingestao/ml/monitoracao mudou)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         run: databricks bundle run -t hml risco_credito_pipeline
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
@@ -83,7 +76,7 @@ jobs:
     environment: prd
     steps:
       - uses: actions/checkout@v4
-      - uses: databricks/setup-cli@main
+      - uses: databricks/setup-cli@v0.2
       - name: Deploy Asset Bundle em PRD
         run: databricks bundle deploy -t prd
         env:
