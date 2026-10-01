@@ -1,0 +1,38 @@
+{
+  "workbench.iconTheme": "vs-minimal",
+  "vsicons.associations.fileDefault.file": null,
+  "vsicons.associations.fileDefault.file_light": null,
+  "terminal.integrated.altClickMovesCursor": false,
+  "terminal.external.windowsExec": "c:\\Program Files\\Git\\git-bash.exe",
+
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  "editor.defaultFormatter": "charliermarsh.ruff",
+  "notebook.defaultFormatter": "charliermarsh.ruff",
+  "notebook.lineNumbers": "on",
+
+  "ruff.lint.run": "onType",
+
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+
+  "python.analysis.typeCheckingMode": "standard",
+
+  "git.autofetch": true,
+  "git.enableSmartCommit": true,
+
+  "security.workspace.trust.untrustedFiles": "open",
+  "docker.extension.enableComposeLanguageServer": false,
+  "yaml.disableSchemaDetection": [],
+  "yaml.schemas": {
+    "file:///c%3A/Users/sergi/.vscode/extensions/docsmsft.docs-yaml-1.0.6/dist/toc.schema.json": "/toc\\.yml/i"
+  }
+}

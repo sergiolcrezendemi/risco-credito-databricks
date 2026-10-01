@@ -1,0 +1,29 @@
+bundle:
+  name: risco-credito-databricks
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: "Catálogo Unity Catalog usado por este ambiente"
+
+targets:
+  dev:
+    default: true
+    workspace:
+      host: https://dbc-13aa7517-c807.cloud.databricks.com
+    variables:
+      catalog: credito_dev
+
+  hml:
+    workspace:
+      host: https://dbc-13aa7517-c807.cloud.databricks.com
+    variables:
+      catalog: credito_hml
+
+  prd:
+    workspace:
+      host: https://dbc-13aa7517-c807.cloud.databricks.com
+    variables:
+      catalog: credito_prd

@@ -1,0 +1,84 @@
+name: CI e Deploy
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: pre-commit run --all-files --show-diff-on-failure
+      - run: python -m pytest tests/ -v
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    outputs:
+      relevante: ${{ steps.filter.outputs.relevante }}
+      pipeline: ${{ steps.filter.outputs.pipeline }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevante:
+              - 'notebooks/**'
+              - 'src/**'
+              - 'resources/**'
+              - 'databricks.yml'
+              - 'pyproject.toml'
+            pipeline:
+              - 'notebooks/ingestao/**'
+              - 'notebooks/ml/**'
+              - 'notebooks/monitoracao/**'
+              - 'src/ingestion/**'
+              - 'src/features/**'
+              - 'src/models/**'
+
+  deploy-hml:
+    if: >
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push' && needs.detect-changes.outputs.relevante == 'true') ||
+      github.event_name == 'workflow_dispatch'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: hml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Deploy Asset Bundle em HML
+        run: databricks bundle deploy -t hml
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      - name: Rodar pipeline (se algo em ingestao/ml/monitoracao mudou)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: databricks bundle run -t hml risco_credito_pipeline
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  deploy-prd:
+    if: >
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.detect-changes.outputs.relevante == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Deploy Asset Bundle em PRD
+        run: databricks bundle deploy -t prd
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
