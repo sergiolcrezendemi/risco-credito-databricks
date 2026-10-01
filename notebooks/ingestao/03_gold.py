@@ -28,10 +28,6 @@
 dbutils.widgets.text("catalog", "credito_dev")
 catalog = dbutils.widgets.get("catalog")
 
-# %% [markdown]
-# ### Import do pacote `src`
-
-# %%
 import sys
 import os
 
@@ -57,19 +53,19 @@ if repo_root not in sys.path:
 
 from src.features.gold import run_gold_ingestion
 
-# %% [markdown]
-# ### Execução
+# MAGIC %md
+# MAGIC ### Execução
 
-# %%
+# MAGIC %%
 run_gold_ingestion(spark, catalog=catalog)
 
-# %% [markdown]
+# MAGIC %md
 # ### Checagem rápida pós-carga
 
-# %%
+# MAGIC %%
 display(spark.table(f"{catalog}.gold.dim_customer").limit(10))
 
-# %%
+# MAGIC %%
 display(spark.table(f"{catalog}.gold.fct_credit_profile").limit(10))
 
 
