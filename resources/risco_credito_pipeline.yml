@@ -21,6 +21,7 @@ resources:
               - scipy>=1.10
               - mlflow>=2.10
               - databricks-sdk>=0.20
+              - -e .
 
       tasks:
         - task_key: bronze_training
