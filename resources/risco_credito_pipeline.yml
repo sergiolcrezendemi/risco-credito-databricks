@@ -21,12 +21,11 @@ resources:
               - scipy>=1.10
               - mlflow>=2.10
               - databricks-sdk>=0.20
+              - ../dist/*.whl
 
       tasks:
         - task_key: bronze_training
           environment_key: default
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ingestao/01_bronze.py
             base_parameters:
@@ -35,8 +34,6 @@ resources:
 
         - task_key: bronze_scoring
           environment_key: default
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ingestao/01_bronze.py
             base_parameters:
@@ -47,8 +44,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: bronze_training
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ingestao/02_silver.py
             base_parameters:
@@ -59,8 +54,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: bronze_scoring
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ingestao/02_silver.py
             base_parameters:
@@ -72,8 +65,6 @@ resources:
           depends_on:
             - task_key: silver
             - task_key: silver_scoring
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ingestao/03_gold.py
             base_parameters:
@@ -83,8 +74,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: gold
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ml/01_hipoteses_h1_h4.py
             base_parameters:
@@ -94,8 +83,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: gold
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ml/02_vies_threshold_roi.py
             base_parameters:
@@ -105,8 +92,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: vies_threshold_roi
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/ml/03_inferencia_batch.py
             base_parameters:
@@ -116,8 +101,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: inferencia_batch
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/monitoracao/01_drift_dados.py
             base_parameters:
@@ -127,8 +110,6 @@ resources:
           environment_key: default
           depends_on:
             - task_key: inferencia_batch
-          libraries:
-            - whl: ../dist/*.whl
           notebook_task:
             notebook_path: ../notebooks/monitoracao/02_concept_drift.py
             base_parameters:
