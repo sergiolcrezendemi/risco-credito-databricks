@@ -1,3 +1,4 @@
+# Databricks notebook source
 #!/usr/bin/env python3
 # scripts/check_notebook_hygiene.py
 # ==============================================================================
