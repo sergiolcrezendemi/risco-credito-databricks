@@ -7,6 +7,12 @@ sync:
     - "notebooks/**/.temp/**"
     - "notebooks/**/.temp_del/**"
 
+artifacts:
+  default:
+    type: whl
+    build: python -m build
+    path: .
+
 include:
   - resources/*.yml
 
