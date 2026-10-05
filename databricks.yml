@@ -1,6 +1,12 @@
 bundle:
   name: risco-credito-databricks
 
+sync:
+  exclude:
+    - ".temp/**"
+    - "notebooks/**/.temp/**"
+    - "notebooks/**/.temp_del/**"
+
 include:
   - resources/*.yml
 
