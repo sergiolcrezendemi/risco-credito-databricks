@@ -5,25 +5,25 @@
   "terminal.integrated.altClickMovesCursor": false,
   "terminal.external.windowsExec": "c:\\Program Files\\Git\\git-bash.exe",
 
+  "editor.formatOnSave": true,
+  "notebook.formatOnSave": true,
+  "notebook.defaultFormatter": "charliermarsh.ruff",
+  "notebook.lineNumbers": "on",
+
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+
   "[python]": {
-    "editor.formatOnSave": true,
     "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
       "source.fixAll.ruff": "explicit",
       "source.organizeImports.ruff": "explicit"
     }
   },
 
-  "editor.defaultFormatter": "charliermarsh.ruff",
-  "notebook.defaultFormatter": "charliermarsh.ruff",
-  "notebook.lineNumbers": "on",
-
   "ruff.lint.run": "onType",
-
-  "files.insertFinalNewline": true,
-  "files.trimFinalNewlines": true,
-  "files.trimTrailingWhitespace": true,
-
   "python.analysis.typeCheckingMode": "standard",
 
   "git.autofetch": true,
