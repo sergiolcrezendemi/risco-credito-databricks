@@ -1,0 +1,33 @@
+
+1
+sincronizar com o pyproject.toml
+
+%uv sync
+dbutils.library.restartPython()
+
+2
+pyproject.toml
+exclude = [
+    "notebooks/**",
+    ".temp/**",
+]
+
+3
+ruff
+
+# quando for versionar e der erro de formato
+
+# 1. Ativa o pre-commit localmente no fluxo do Git
+pre-commit install
+
+# 2. Executa a formatação em todos os arquivos para aplicar as correções
+pre-commit run --all-files
+
+# 3. Adiciona os arquivos ajustados ao stage
+git add .temp/valida_vercionamento.txt notebooks/ingestao/03_gold.py
+
+# 4. Cria o commit de ajuste de formatação
+git commit -m "style: remove trailing newlines via end-of-file-fixer"
+
+# 5. Envia as correções para a branch remota
+git push origin develop
