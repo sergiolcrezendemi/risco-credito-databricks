@@ -67,5 +67,3 @@ display(spark.table(f"{catalog}.gold.dim_customer").limit(10))
 
 # MAGIC %%
 display(spark.table(f"{catalog}.gold.fct_credit_profile").limit(10))
-
-

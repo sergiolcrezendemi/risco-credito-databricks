@@ -29,5 +29,3 @@ git commit -m "fix: exclui pastas temporarias do linter e formata arquivos"
 git push origin develop
 
 git rm -r --cached src/risco_credito_databricks.egg-info   ->se necessario excluir diretorio
-
-
