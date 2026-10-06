@@ -11,6 +11,31 @@ criar ambiente de homologação
 ```
 
 
+```
+ruff
+  pre-commit run --all-files
+  git add -A
+  git commit -m "style: aplica ruff-format em seed_hml_volumes-old.py"
+  git push
+
+
+
+bash
+pip install pre-commit
+pre-commit install   # opcional: roda os hooks automaticamente a cada commit
+
+  pre-commit run --all-files
+  git add -A
+  git commit -m "style: aplica ruff-format em seed_hml_volumes-old.py"
+  git push
+
+Na primeira execução o hook vai falhar e reformatar o arquivo. Rode de novo para confirmar que todos passam, e então faça o commit. Se ainda não tiver o pre-commit instalado localmente:
+
+bash
+
+
+```
+
 
 ```
 fluxo para a carga inicial
