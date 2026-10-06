@@ -1,6 +1,18 @@
 %md
 
 ```
+criar ambiente de homologação
+
+1- rodar o script /risco_credito_databricks/script/setup/script-homologação/seed_hml_volume_inicial.ipnb
+2-
+
+
+
+```
+
+
+
+```
 fluxo para a carga inicial
 
 1- executar o job: job-ingestao

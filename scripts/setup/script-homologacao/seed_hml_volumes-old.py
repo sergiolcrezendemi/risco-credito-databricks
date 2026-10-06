@@ -26,3 +26,4 @@ for ds in datasets:
         print(f"[OK] Volume {ds} populado com sucesso em {target_catalog}.")
     except Exception as e:
         print(f"[ERRO] Falha ao copiar {ds}: {str(e)}")
+
