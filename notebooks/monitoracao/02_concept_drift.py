@@ -259,9 +259,13 @@ else:
 
 # Leitura esperada por modo — ajuda a validar o próprio notebook
 if modo_efetivo == "simulacao":
-    print(f"[TESTE] Modo simulacao deve ALERTAR: {'OK' if alerta else 'FALHOU — não alertou'}")
+    print(
+        f"[TESTE] Modo simulacao deve ALERTAR: {'OK' if alerta else 'FALHOU — não alertou'}"
+    )
 elif modo_efetivo == "treino_amostra":
-    print(f"[TESTE] Modo treino_amostra NÃO deve alertar: {'OK' if not alerta else 'FALHOU — alertou'}")
+    print(
+        f"[TESTE] Modo treino_amostra NÃO deve alertar: {'OK' if not alerta else 'FALHOU — alertou'}"
+    )
 
 # COMMAND ----------
 
