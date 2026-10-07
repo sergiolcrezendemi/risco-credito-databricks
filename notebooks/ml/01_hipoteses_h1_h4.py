@@ -148,7 +148,7 @@ for b in barras:
         (b.get_x() + b.get_width() / 2, altura),
         textcoords="offset points",
         xytext=(0, 4),
-        ha="center"
+        ha="center",
 )
 ax.set_ylabel("Impacto médio no modelo (|SHAP|)")
 ax.set_title(
@@ -182,13 +182,13 @@ ax1.plot(
     threshold_df["approval_rate"],
     marker="o",
     color=COR_NEUTRA,
-    label="Taxa de aprovação"
+    label="Taxa de aprovação",
 )
 ax1.axhline(
     h3["min_approval_rate"],
     color=COR_BASELINE,
     linestyle="--",
-    label="Piso de aprovação"
+    label="Piso de aprovação",
 )
 ax1.set_xlabel("Threshold de probabilidade")
 ax1.set_ylabel("Taxa de aprovação", color=COR_NEUTRA)
@@ -197,13 +197,13 @@ ax2.plot(
     threshold_df["threshold"], 
     threshold_df["default_rate_approved"], 
     marker="s", color=COR_ALERTA,
-    label="Inadimplência na carteira aprovada"
+    label="Inadimplência na carteira aprovada",
 )
 ax2.axhline(
     h3["baseline_default_rate"], 
     color=COR_ALERTA, 
     linestyle=":", 
-    label="Baseline sem filtro"
+    label="Baseline sem filtro",
 )
 ax2.set_ylabel("Inadimplência aprovados", color=COR_ALERTA)
 if h3["best_row"] is not None:
@@ -211,7 +211,7 @@ if h3["best_row"] is not None:
         h3["best_row"]["threshold"], 
         color=COR_CONFIRMADA, 
         linewidth=1.5, 
-        label="Melhor threshold"
+        label="Melhor threshold",
 )
 l1, lb1 = ax1.get_legend_handles_labels()
 l2, lb2 = ax2.get_legend_handles_labels()
@@ -260,7 +260,7 @@ if h4["impacto_liquido"] is not None:
             textcoords="offset points",
             xytext=(0, 6 if altura >= 0 else -14), 
             ha="center", 
-            fontsize=8
+            fontsize=8,
     )
     ax.set_ylabel("R$ (valores ilustrativos)")
     ax.set_title(f"H4 — Impacto Financeiro Líquido | {h4['status']}")

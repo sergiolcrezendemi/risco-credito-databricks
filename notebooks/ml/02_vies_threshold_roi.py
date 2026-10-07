@@ -136,13 +136,13 @@ ax.axvline(
     threshold_result["threshold_custo_minimo"], 
     color="gray", 
     linestyle=":",
-    label=f"Custo mínimo = {threshold_result['threshold_custo_minimo']:.2f}"
+    label=f"Custo mínimo = {threshold_result['threshold_custo_minimo']:.2f}",
 )
 ax.axvline(
     THRESHOLD_OPERACIONAL, 
     color="red", 
     linestyle="--",
-    label=f"Operacional = {THRESHOLD_OPERACIONAL:.2f}"
+    label=f"Operacional = {THRESHOLD_OPERACIONAL:.2f}",
 )
 ax.set_xlabel("Threshold de probabilidade")
 ax.set_ylabel("Custo total esperado (R$)")
@@ -190,7 +190,7 @@ for ax, (nome, tabela) in zip(
         axes, 
         [
                 ("Faixa etária", bias_result["tabela_idade"]),
-                ("Faixa de renda", bias_result["tabela_renda"])
+                ("Faixa de renda", bias_result["tabela_renda"]),
         ]
     ):
     ax.bar(tabela["grupo"], tabela["bons_negados"], color="#1f4e79")
@@ -198,7 +198,7 @@ for ax, (nome, tabela) in zip(
         bias_result["df_val"].query("y_true == 0")["y_pred"].mean(), 
         color="red",
         linestyle="--", 
-        label="Média geral"
+        label="Média geral",
     )
     ax.set_title(nome)
     ax.tick_params(axis="x", rotation=30)
@@ -226,7 +226,7 @@ for versao in ["bruta", "calibrada"]:
     r = calibration_result[versao]
     print(
         f"{versao:<10} média prevista {r['media_prevista']:.2%} | Brier {r['brier']:.4f} | "
-        f"erro médio de calibração {r['erro_calibracao_medio']:.4f}"
+        f"erro médio de calibração {r['erro_calibracao_medio']:.4f}",
     )
 
 fig, ax = plt.subplots(figsize=(6, 6))
@@ -238,7 +238,7 @@ for versao, cor in [("bruta", "#c0392b"), ("calibrada", "#1f4e79")]:
         curva["inadimplencia_observada"], 
         marker="o", 
         color=cor,
-        label=versao.capitalize()
+        label=versao.capitalize(),
     )
 ax.set_xlabel("Probabilidade prevista")
 ax.set_ylabel("Inadimplência observada")
@@ -322,14 +322,14 @@ print(
 )
 print(
       f"Inadimplência: {financial_result['taxa_sem_modelo']:.2%} sem modelo -> "
-      f"{financial_result['taxa_com_modelo']:.2%} com modelo"
+      f"{financial_result['taxa_com_modelo']:.2%} com modelo",
 )
 print(f"Perda evitada ({financial_result['maus_recusados']:,} maus recusados): "
       f"R$ {financial_result['perda_evitada']:,.0f}"
 )
 print(
       f"Custo de oportunidade ({financial_result['bons_negados']:,} bons negados): "
-      f"R$ {financial_result['custo_oportunidade']:,.0f}"
+      f"R$ {financial_result['custo_oportunidade']:,.0f}",
 )
 print(f"Impacto líquido: R$ {financial_result['impacto_liquido']:,.0f}")
 print(f"Ponto de equilíbrio: o modelo se paga enquanto a perda por calote for maior que "
