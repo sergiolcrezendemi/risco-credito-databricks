@@ -25,12 +25,13 @@ target-version = "py311"
 builtins = ["dbutils"]
 force-exclude = true
 extend-include = ["*.ipynb"]
-extend-exclude = ["**/.temp/**",
+extend-exclude = [
+    "**/.temp/**",
     ".temp/**",
     "docs/**",
-    ".temp_del/**",
-     "notebooks/ead"
+    ".temp_del/**"
 ]
+
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

@@ -52,10 +52,16 @@ table_name = f"{catalog}.bronze.give_me_some_credit_{dataset}_raw"
 df_bronze = spark.table(table_name)
 
 numeric_cols = [
-    "SeriousDlqin2yrs", "RevolvingUtilizationOfUnsecuredLines", "age",
-    "NumberOfTime30-59DaysPastDueNotWorse", "DebtRatio", "MonthlyIncome",
-    "NumberOfOpenCreditLinesAndLoans", "NumberOfTimes90DaysLate",
-    "NumberRealEstateLoansOrLines", "NumberOfTime60-89DaysPastDueNotWorse",
+    "SeriousDlqin2yrs",
+    "RevolvingUtilizationOfUnsecuredLines",
+    "age",
+    "NumberOfTime30-59DaysPastDueNotWorse",
+    "DebtRatio",
+    "MonthlyIncome",
+    "NumberOfOpenCreditLinesAndLoans",
+    "NumberOfTimes90DaysLate",
+    "NumberRealEstateLoansOrLines",
+    "NumberOfTime60-89DaysPastDueNotWorse",
     "NumberOfDependents",
 ]
 
@@ -74,3 +80,4 @@ df_diagnostico_nulos = run_profile(
 # COMMAND ----------
 
 display(df_diagnostico_nulos)
+

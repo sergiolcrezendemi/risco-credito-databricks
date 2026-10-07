@@ -53,10 +53,16 @@ table_name = f"{catalog}.silver.give_me_some_credit"
 df_silver = spark.table(table_name)
 
 numeric_cols = [
-    "age", "debt_ratio", "monthly_income", "revolving_utilization_unsecured",
-    "num_open_credit_lines_and_loans", "num_times_30_59_days_late",
-    "num_times_60_89_days_late", "num_times_90_days_late",
-    "num_real_estate_loans_or_lines", "num_dependents",
+    "age",
+    "debt_ratio",
+    "monthly_income",
+    "revolving_utilization_unsecured",
+    "num_open_credit_lines_and_loans",
+    "num_times_30_59_days_late",
+    "num_times_60_89_days_late",
+    "num_times_90_days_late",
+    "num_real_estate_loans_or_lines",
+    "num_dependents",
 ]
 
 df_diagnostico_nulos = run_profile(
@@ -89,8 +95,7 @@ display(
 import matplotlib.pyplot as plt
 
 pdf_target = (
-    df_silver
-    .withColumn(
+    df_silver.withColumn(
         "status_cliente",
         F.when(F.col("target_default_2yrs") == 1, "Inadimplente (1)").otherwise("Adimplente (0)"),
     )
@@ -101,7 +106,9 @@ pdf_target = (
 
 fig, ax = plt.subplots(figsize=(6, 4))
 bars = ax.bar(pdf_target["status_cliente"], pdf_target["count"], color=["#1f77b4", "#d62728"])
-ax.bar_label(bars, fmt="{:,.0f}", label_type="center", color="white", fontweight="bold", fontsize=11)
+ax.bar_label(
+    bars, fmt="{:,.0f}", label_type="center", color="white", fontweight="bold", fontsize=11
+)
 ax.set_title("Distribuição do Target", fontsize=12, fontweight="bold")
 ax.set_xlabel("Status do Cliente")
 ax.set_ylabel("Contagem")
@@ -122,3 +129,4 @@ display(
         F.sum(F.when(F.col("age").isNull(), 1).otherwise(0)).alias("qtd_idade_em_quarentena"),
     )
 )
+
