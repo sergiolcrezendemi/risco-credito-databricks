@@ -1,10 +1,15 @@
 #!/bin/bash
 set -e
 
+
+# [codigo para achar path de aplicação]
+# which python3
+# /databricks/python/bin/python -m pip show ruff | head -3
+# ls ~/.local/bin | grep -E "ruff|fixer|check-yaml"
+
 # export PATH="$(python3 -c 'import site; print(site.USER_BASE)')/bin:$PATH"
-export PATH="/databricks/python/bin:$PATH"
-
-
+# export PATH="/databricks/python/bin:$PATH"
+export PATH="$HOME/.local/bin:/databricks/python/bin:$PATH"
 
 # executar:  bash scripts/formatar.sh
 # vai para a raiz do projeto, onde quer que o script seja chamado
