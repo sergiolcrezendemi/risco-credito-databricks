@@ -42,4 +42,3 @@ targets:
       host: https://dbc-13aa7517-c807.cloud.databricks.com
     variables:
       catalog: credito_prd
-  

@@ -29,6 +29,7 @@ exclude = [
     "**/.temp/**",
     ".temp/**",
     "docs/**",
+    ".temp_del/**"
 ]
 
 [tool.ruff.lint]
