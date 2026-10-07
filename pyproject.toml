@@ -24,9 +24,10 @@ line-length = 100
 target-version = "py311"
 builtins = ["dbutils"]
 force-exclude = true
-exclude = [
-    "notebooks/**",
-    "**/.temp/**",
+extend-include = ["*.ipynb",
+                  "*.py"
+                ]
+extend-exclude = ["**/.temp/**",
     ".temp/**",
     "docs/**",
     ".temp_del/**"
