@@ -113,7 +113,9 @@ print(f"Conclusão H1: {h1['status']}")
 
 cor_h1 = COR_CONFIRMADA if h1["status"] == "Confirmada" else COR_ALERTA
 fig, ax = plt.subplots(figsize=(8, 5))
-ax.scatter(shap_sample[h1["feature"]], shap_values[:, h1["feature"]].values, alpha=0.35, s=12, color=cor_h1)
+ax.scatter(
+        shap_sample[h1["feature"]], shap_values[:, h1["feature"]].values, alpha=0.35, s=12, color=cor_h1
+)
 ax.axhline(0, color=COR_BASELINE, linewidth=1, linestyle="--")
 ax.set_xlim(-0.05, 2.0)
 ax.set_xlabel(h1["feature"])
@@ -136,13 +138,21 @@ print(f"Conclusão H2: {h2['status']}")
 
 cor_h2 = COR_CONFIRMADA if h2["status"] == "Confirmada" else COR_ALERTA
 fig, ax = plt.subplots(figsize=(6, 5))
-barras = ax.bar([h2["feature_a"], h2["feature_b"]], [h2["shap_a"], h2["shap_b"]], color=[cor_h2, COR_BASELINE])
+barras = ax.bar(
+    [h2["feature_a"], h2["feature_b"]], [h2["shap_a"], h2["shap_b"]], color=[cor_h2, COR_BASELINE]
+)
 for b in barras:
     altura = b.get_height()
-    ax.annotate(f"{altura:.4f}", (b.get_x() + b.get_width() / 2, altura), textcoords="offset points",
-                xytext=(0, 4), ha="center")
+    ax.annotate(
+        f"{altura:.4f}", (b.get_x() + b.get_width() / 2, altura), 
+        textcoords="offset points",
+        xytext=(0, 4), 
+        ha="center"
+)
 ax.set_ylabel("Impacto médio no modelo (|SHAP|)")
-ax.set_title(f"H2 — debt_ratio vs age | diferença relativa = {h2['diferenca_relativa']:.1%} | {h2['status']}")
+ax.set_title(
+    f"H2 — debt_ratio vs age | diferença relativa = {h2['diferenca_relativa']:.1%} | {h2['status']}"
+)
 plt.tight_layout()
 plt.show()
 
@@ -163,7 +173,9 @@ print(f"Conclusão H3: {h3['status']}")
 
 threshold_df = h3["threshold_df"]
 fig, ax1 = plt.subplots(figsize=(9, 5))
-ax1.plot(threshold_df["threshold"], threshold_df["approval_rate"], marker="o", color=COR_NEUTRA, label="Taxa de aprovação")
+ax1.plot(
+    threshold_df["threshold"], threshold_df["approval_rate"], marker="o", color=COR_NEUTRA, label="Taxa de aprovação"
+)
 ax1.axhline(h3["min_approval_rate"], color=COR_BASELINE, linestyle="--", label="Piso de aprovação")
 ax1.set_xlabel("Threshold de probabilidade")
 ax1.set_ylabel("Taxa de aprovação", color=COR_NEUTRA)
@@ -197,7 +209,9 @@ h4 = hv.validate_h4(models.y_test, models.y_pred_xgb, h3)
 if h4["impacto_liquido"] is not None:
     print(f"Threshold usado (herdado de H3): {h4['threshold_usado']}")
     print(f"Maus pagadores evitados: {h4['maus_pagadores_evitados']} -> Perda evitada: R$ {h4['perda_evitada']:,.2f}")
-    print(f"Bons pagadores rejeitados: {h4['bons_pagadores_rejeitados']} -> Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}")
+    print(
+        f"Bons pagadores rejeitados: {h4['bons_pagadores_rejeitados']} -> Custo de oportunidade: R$ {h4['custo_oportunidade']:,.2f}"
+    )
     print(f"Impacto financeiro líquido: R$ {h4['impacto_liquido']:,.2f}")
     print(f"Conclusão H4: {h4['status']}")
 
