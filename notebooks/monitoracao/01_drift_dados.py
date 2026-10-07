@@ -236,6 +236,7 @@ df_drift["base_atual"] = BASE_ATUAL
 df_drift["n_referencia"] = len(df_referencia)
 df_drift["n_atual"] = len(df_atual)
 
+
 def garantir_colunas(tabela: str, colunas: dict) -> None:
     """Se a tabela já existe, adiciona as colunas que faltam (ALTER TABLE).
     Se ainda não existe, o saveAsTable abaixo a cria já com todas."""
@@ -260,3 +261,4 @@ garantir_colunas(OUTPUT_TABLE, {"base_atual": "STRING"})
 )
 
 print(f"\nResultado gravado em {OUTPUT_TABLE} e logado no experimento '{MONITORING_EXPERIMENT}'.")
+

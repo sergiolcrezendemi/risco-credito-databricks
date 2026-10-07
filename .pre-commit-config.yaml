@@ -1,4 +1,4 @@
-exclude: '^(\.temp/|\.temp_del/)'
+exclude: '(^|/)(\.temp|\.temp_del|docs)/'
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.0

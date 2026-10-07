@@ -85,7 +85,7 @@ df = load_gold_training_data(spark, catalog=catalog)
 X_train, X_test, y_train, y_test = brv.prepare_train_test(df)
 print(
     f"Treino: {len(X_train):,} | Teste: {len(X_test):,} | Inadimplência no teste: {y_test.mean():.2%}"
-)  
+)
 
 model = brv.load_champion_model(catalog, "gold", MODEL_NAME, MODEL_ALIAS)
 y_proba_test = model.predict_proba(X_test)[:, 1]
@@ -133,14 +133,14 @@ df_custos = threshold_result["df_custos"]
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.plot(df_custos["threshold"], df_custos["custo_total"])
 ax.axvline(
-    threshold_result["threshold_custo_minimo"], 
-    color="gray", 
+    threshold_result["threshold_custo_minimo"],
+    color="gray",
     linestyle=":",
     label=f"Custo mínimo = {threshold_result['threshold_custo_minimo']:.2f}",
 )
 ax.axvline(
-    THRESHOLD_OPERACIONAL, 
-    color="red", 
+    THRESHOLD_OPERACIONAL,
+    color="red",
     linestyle="--",
     label=f"Operacional = {THRESHOLD_OPERACIONAL:.2f}",
 )
@@ -187,17 +187,17 @@ else:
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True)
 for ax, (nome, tabela) in zip(
-        axes, 
-        [
-                ("Faixa etária", bias_result["tabela_idade"]),
-                ("Faixa de renda", bias_result["tabela_renda"]),
-        ]
-    ):
+    axes,
+    [
+        ("Faixa etária", bias_result["tabela_idade"]),
+        ("Faixa de renda", bias_result["tabela_renda"]),
+    ],
+):
     ax.bar(tabela["grupo"], tabela["bons_negados"], color="#1f4e79")
     ax.axhline(
-        bias_result["df_val"].query("y_true == 0")["y_pred"].mean(), 
+        bias_result["df_val"].query("y_true == 0")["y_pred"].mean(),
         color="red",
-        linestyle="--", 
+        linestyle="--",
         label="Média geral",
     )
     ax.set_title(nome)
@@ -234,9 +234,9 @@ ax.plot([0, 1], [0, 1], color="gray", linestyle=":", label="Calibração perfeit
 for versao, cor in [("bruta", "#c0392b"), ("calibrada", "#1f4e79")]:
     curva = calibration_result[versao]["curva"]
     ax.plot(
-        curva["prob_prevista"], 
-        curva["inadimplencia_observada"], 
-        marker="o", 
+        curva["prob_prevista"],
+        curva["inadimplencia_observada"],
+        marker="o",
         color=cor,
         label=versao.capitalize(),
     )
@@ -257,10 +257,10 @@ plt.show()
 # COMMAND ----------
 
 comparacao = brv.compare_with_logistic(
-    X_train, 
-    y_train, 
-    X_test, 
-    y_test, 
+    X_train,
+    y_train,
+    X_test,
+    y_test,
     y_proba_test,
     taxa_aprovacao=threshold_result["aprovacao_threshold_operacional"],
 )
@@ -279,10 +279,10 @@ print(comparacao.to_string(index=False))
 # COMMAND ----------
 
 experimento_sem_idade = brv.experimento_sem_variavel(
-    X_train, 
-    y_train, 
-    X_test, 
-    y_test, 
+    X_train,
+    y_train,
+    X_test,
+    y_test,
     y_proba_test,
     taxa_aprovacao=threshold_result["aprovacao_threshold_operacional"],
 )
@@ -296,9 +296,7 @@ fig, ax = plt.subplots(figsize=(9, 4.5))
 largura = 0.38
 posicoes = range(len(tabela))
 for deslocamento, nome, cor in zip(
-    [-largura / 2, largura / 2], 
-    modelos_exp, 
-    ["#1f4e79", "#e67e22"]
+    [-largura / 2, largura / 2], modelos_exp, ["#1f4e79", "#e67e22"]
 ):
     ax.bar([p + deslocamento for p in posicoes], tabela[nome], width=largura, label=nome, color=cor)
 ax.set_xticks(list(posicoes))
@@ -318,22 +316,24 @@ plt.show()
 
 financial_result = brv.financial_impact(bias_result["df_val"])
 print(
-      f"Operações analisadas: {financial_result['n_operacoes']:,} | aprovação {financial_result['taxa_aprovacao']:.1%}"
+    f"Operações analisadas: {financial_result['n_operacoes']:,} | aprovação {financial_result['taxa_aprovacao']:.1%}"
 )
 print(
-      f"Inadimplência: {financial_result['taxa_sem_modelo']:.2%} sem modelo -> "
-      f"{financial_result['taxa_com_modelo']:.2%} com modelo",
-)
-print(f"Perda evitada ({financial_result['maus_recusados']:,} maus recusados): "
-      f"R$ {financial_result['perda_evitada']:,.0f}"
+    f"Inadimplência: {financial_result['taxa_sem_modelo']:.2%} sem modelo -> "
+    f"{financial_result['taxa_com_modelo']:.2%} com modelo",
 )
 print(
-      f"Custo de oportunidade ({financial_result['bons_negados']:,} bons negados): "
-      f"R$ {financial_result['custo_oportunidade']:,.0f}",
+    f"Perda evitada ({financial_result['maus_recusados']:,} maus recusados): "
+    f"R$ {financial_result['perda_evitada']:,.0f}"
+)
+print(
+    f"Custo de oportunidade ({financial_result['bons_negados']:,} bons negados): "
+    f"R$ {financial_result['custo_oportunidade']:,.0f}",
 )
 print(f"Impacto líquido: R$ {financial_result['impacto_liquido']:,.0f}")
-print(f"Ponto de equilíbrio: o modelo se paga enquanto a perda por calote for maior que "
-      f"{financial_result['razao_equilibrio_perda_margem']:.1f}x a margem de um bom cliente."
+print(
+    f"Ponto de equilíbrio: o modelo se paga enquanto a perda por calote for maior que "
+    f"{financial_result['razao_equilibrio_perda_margem']:.1f}x a margem de um bom cliente."
 )
 
 # COMMAND ----------
@@ -344,6 +344,12 @@ print(f"Ponto de equilíbrio: o modelo se paga enquanto a perda por calote for m
 # COMMAND ----------
 
 brv.log_validation_to_mlflow(
-    threshold_result, financial_result, ranking_shap, bias_result, calibration_result, comparacao,
+    threshold_result,
+    financial_result,
+    ranking_shap,
+    bias_result,
+    calibration_result,
+    comparacao,
     experimento_sem_idade,
 )
+

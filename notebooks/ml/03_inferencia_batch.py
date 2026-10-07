@@ -37,7 +37,6 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 
-
 # COMMAND ----------
 
 # =========================
@@ -195,3 +194,4 @@ print(df_resultado["probabilidade_inadimplencia"].describe())
 spark.createDataFrame(df_resultado).write.mode("append").saveAsTable(OUTPUT_TABLE)
 print(f"\n{len(df_resultado)} previsões gravadas em {OUTPUT_TABLE}.")
 print("Inferência em lote concluída.")
+

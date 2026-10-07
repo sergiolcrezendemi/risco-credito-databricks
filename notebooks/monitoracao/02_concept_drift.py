@@ -259,9 +259,7 @@ else:
 
 # Leitura esperada por modo — ajuda a validar o próprio notebook
 if modo_efetivo == "simulacao":
-    print(
-        f"[TESTE] Modo simulacao deve ALERTAR: {'OK' if alerta else 'FALHOU — não alertou'}"
-    )
+    print(f"[TESTE] Modo simulacao deve ALERTAR: {'OK' if alerta else 'FALHOU — não alertou'}")
 elif modo_efetivo == "treino_amostra":
     print(
         f"[TESTE] Modo treino_amostra NÃO deve alertar: {'OK' if not alerta else 'FALHOU — alertou'}"
@@ -335,6 +333,7 @@ df_resultado = pd.DataFrame(
     ]
 )
 
+
 def garantir_colunas(tabela: str, colunas: dict) -> None:
     """Se a tabela já existe, adiciona as colunas que faltam (ALTER TABLE).
     Se ainda não existe, o saveAsTable abaixo a cria já com todas."""
@@ -367,3 +366,4 @@ garantir_colunas(
 )
 
 print(f"\nResultado gravado em {OUTPUT_TABLE} e logado no experimento '{MONITORING_EXPERIMENT}'.")
+

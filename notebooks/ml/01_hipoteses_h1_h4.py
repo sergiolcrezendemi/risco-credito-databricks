@@ -149,7 +149,7 @@ for b in barras:
         textcoords="offset points",
         xytext=(0, 4),
         ha="center",
-)
+    )
 ax.set_ylabel("Impacto médio no modelo (|SHAP|)")
 ax.set_title(
     f"H2 — debt_ratio vs age | diferença relativa = {h2['diferenca_relativa']:.1%} | {h2['status']}"
@@ -170,8 +170,9 @@ print(
 )
 if h3["best_row"] is not None:
     br = h3["best_row"]
-    print(f"Melhor threshold: {br['threshold']} | Aprovação: {br['approval_rate']:.2%} | "
-          f"Inadimplência aprovados: {br['default_rate_approved']:.2%}"
+    print(
+        f"Melhor threshold: {br['threshold']} | Aprovação: {br['approval_rate']:.2%} | "
+        f"Inadimplência aprovados: {br['default_rate_approved']:.2%}"
     )
 print(f"Conclusão H3: {h3['status']}")
 
@@ -194,25 +195,26 @@ ax1.set_xlabel("Threshold de probabilidade")
 ax1.set_ylabel("Taxa de aprovação", color=COR_NEUTRA)
 ax2 = ax1.twinx()
 ax2.plot(
-    threshold_df["threshold"], 
-    threshold_df["default_rate_approved"], 
-    marker="s", color=COR_ALERTA,
+    threshold_df["threshold"],
+    threshold_df["default_rate_approved"],
+    marker="s",
+    color=COR_ALERTA,
     label="Inadimplência na carteira aprovada",
 )
 ax2.axhline(
-    h3["baseline_default_rate"], 
-    color=COR_ALERTA, 
-    linestyle=":", 
+    h3["baseline_default_rate"],
+    color=COR_ALERTA,
+    linestyle=":",
     label="Baseline sem filtro",
 )
 ax2.set_ylabel("Inadimplência aprovados", color=COR_ALERTA)
 if h3["best_row"] is not None:
     ax1.axvline(
-        h3["best_row"]["threshold"], 
-        color=COR_CONFIRMADA, 
-        linewidth=1.5, 
+        h3["best_row"]["threshold"],
+        color=COR_CONFIRMADA,
+        linewidth=1.5,
         label="Melhor threshold",
-)
+    )
 l1, lb1 = ax1.get_legend_handles_labels()
 l2, lb2 = ax2.get_legend_handles_labels()
 ax1.legend(l1 + l2, lb1 + lb2, loc="center left", fontsize=8)
@@ -255,13 +257,12 @@ if h4["impacto_liquido"] is not None:
         altura = b.get_height()
         ax.annotate(
             f"R$ {altura:,.0f}",
-            (b.get_x() + b.get_width() / 2,
-            altura), 
+            (b.get_x() + b.get_width() / 2, altura),
             textcoords="offset points",
-            xytext=(0, 6 if altura >= 0 else -14), 
-            ha="center", 
+            xytext=(0, 6 if altura >= 0 else -14),
+            ha="center",
             fontsize=8,
-    )
+        )
     ax.set_ylabel("R$ (valores ilustrativos)")
     ax.set_title(f"H4 — Impacto Financeiro Líquido | {h4['status']}")
     plt.tight_layout()
@@ -279,3 +280,4 @@ else:
 summary_df = hv.build_hypotheses_summary(h1, h2, h3, h4)
 display(spark.createDataFrame(summary_df))
 hv.persist_hypotheses_summary(spark, summary_df, catalog=catalog)
+
