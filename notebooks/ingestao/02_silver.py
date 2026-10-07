@@ -67,7 +67,7 @@ run_silver_ingestion(spark, catalog=catalog, dataset=dataset)
 
 # COMMAND ----------
 
-target_table_name = ( 
+target_table_name = (
     "give_me_some_credit" if dataset == "training" else f"give_me_some_credit_{dataset}"
 )
 display(spark.table(f"{catalog}.silver.{target_table_name}").limit(10))

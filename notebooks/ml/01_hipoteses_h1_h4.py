@@ -144,10 +144,10 @@ barras = ax.bar(
 for b in barras:
     altura = b.get_height()
     ax.annotate(
-        f"{altura:.4f}", 
-        (b.get_x() + b.get_width() / 2, altura), 
+        f"{altura:.4f}",
+        (b.get_x() + b.get_width() / 2, altura),
         textcoords="offset points",
-        xytext=(0, 4), 
+        xytext=(0, 4),
         ha="center"
 )
 ax.set_ylabel("Impacto médio no modelo (|SHAP|)")
@@ -178,26 +178,26 @@ print(f"Conclusão H3: {h3['status']}")
 threshold_df = h3["threshold_df"]
 fig, ax1 = plt.subplots(figsize=(9, 5))
 ax1.plot(
-    threshold_df["threshold"], 
-    threshold_df["approval_rate"], 
-    marker="o", 
-    color=COR_NEUTRA, 
+    threshold_df["threshold"],
+    threshold_df["approval_rate"],
+    marker="o",
+    color=COR_NEUTRA,
     label="Taxa de aprovação"
 )
 ax1.axhline(
-        h3["min_approval_rate"], 
-        color=COR_BASELINE, 
-        linestyle="--", 
-        label="Piso de aprovação"
+    h3["min_approval_rate"],
+    color=COR_BASELINE,
+    linestyle="--",
+    label="Piso de aprovação"
 )
 ax1.set_xlabel("Threshold de probabilidade")
 ax1.set_ylabel("Taxa de aprovação", color=COR_NEUTRA)
 ax2 = ax1.twinx()
 ax2.plot(
-        threshold_df["threshold"], 
-        threshold_df["default_rate_approved"], 
-        marker="s", color=COR_ALERTA,
-        label="Inadimplência na carteira aprovada"
+    threshold_df["threshold"], 
+    threshold_df["default_rate_approved"], 
+    marker="s", color=COR_ALERTA,
+    label="Inadimplência na carteira aprovada"
 )
 ax2.axhline(
     h3["baseline_default_rate"], 
@@ -254,8 +254,8 @@ if h4["impacto_liquido"] is not None:
     for b in barras:
         altura = b.get_height()
         ax.annotate(
-            f"R$ {altura:,.0f}", 
-            (b.get_x() + b.get_width() / 2, 
+            f"R$ {altura:,.0f}",
+            (b.get_x() + b.get_width() / 2,
             altura), 
             textcoords="offset points",
             xytext=(0, 6 if altura >= 0 else -14), 
