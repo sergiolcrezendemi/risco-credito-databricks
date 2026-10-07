@@ -15,8 +15,10 @@ repos:
     hooks:
       - id: trailing-whitespace
         types_or: [python, jupyter]
+        exclude: ^notebooks/
       - id: end-of-file-fixer
         types_or: [python, jupyter]
+        exclude: ^notebooks/
       - id: check-yaml
       - id: check-added-large-files
         args: [--maxkb=5000]
