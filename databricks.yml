@@ -3,9 +3,12 @@ bundle:
 
 sync:
   exclude:
-    - ".temp/**"
-    - "notebooks/**/.temp/**"
-    - "notebooks/**/.temp_del/**"
+    - "**/.venv/**"
+    - "**/__pycache__/**"
+    - "**/.temp/**"
+    - "**/.temp_del/**"
+    - ".ruff_cache/**"
+    - ".git/**"
 
 artifacts:
   default:
