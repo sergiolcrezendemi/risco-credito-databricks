@@ -12,3 +12,4 @@ catalog = dbutils.widgets.get("catalog")
 
 # TODO: carregar dado tratado (Silver), treinar XGBoost + Regressao Logistica,
 #       comparar, logar no MLflow, registrar nova versao no Model Registry
+

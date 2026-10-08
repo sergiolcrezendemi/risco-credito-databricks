@@ -3,9 +3,25 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
-# MAGIC %%sh
-# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-# MAGIC uv sync
+# %%sh
+# # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# uv sync
+
+
+
+
+# COMMAND ----------
+
+# IMPORTANTE: este bloco só executa em desenvolvimento (interativo).
+# Em job (hml/prd) as dependências vêm do bloco `environments` de
+# resources/risco_credito_pipeline.yml.
+ctx = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
+
+if not ctx.jobId().isDefined():
+    import subprocess
+    result = subprocess.run(["uv", "sync"], capture_output=True, text=True)
+    print(result.stdout, result.stderr)
+    result.check_returncode()
 
 # COMMAND ----------
 

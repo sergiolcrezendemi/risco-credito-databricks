@@ -357,3 +357,4 @@ except mlflow.exceptions.RestException:
     )
 
 print("\nTreino concluído e registrado no MLflow / Unity Catalog Model Registry.")
+

@@ -4,7 +4,9 @@
 criar ambiente de homologação
 
 1- rodar o script /risco_credito_databricks/script/setup/script-homologação/seed_hml_volume_inicial.ipnb
-2-
+2- para validar se o código esta correto para ir para homologação
+       no terminal do databricks 
+           digitar:   bash scripts/formatar.sh
 
 
 
