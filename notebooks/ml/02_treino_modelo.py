@@ -1,6 +1,12 @@
 # Databricks notebook source
-# IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
-%uv sync
+# MAGIC %uv sync
+# MAGIC
+# MAGIC # IMPORTANTE: ESTE COMANDO SÓ E EXECUTADO EM DESENVOLVIMENTO EM PRODUÇÃO SERÁ VIA JOB E A CONFIGURAÇÃO ESTÃO NO ARQUIVO resources/job.yml ou outros arquivo que será executado em produção
+# MAGIC
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -12,4 +18,3 @@ catalog = dbutils.widgets.get("catalog")
 
 # TODO: carregar dado tratado (Silver), treinar XGBoost + Regressao Logistica,
 #       comparar, logar no MLflow, registrar nova versao no Model Registry
-
