@@ -11,7 +11,7 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 # risco-credito-databricks — Retreino do modelo
-import mlflow
+# import mlflow
 
 dbutils.widgets.text("catalog", "credito_dev")
 catalog = dbutils.widgets.get("catalog")
