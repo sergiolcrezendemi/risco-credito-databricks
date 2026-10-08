@@ -10,6 +10,7 @@ sync:
     - ".ruff_cache/**"
     - ".git/**"
 
+
 artifacts:
   default:
     type: whl
@@ -22,6 +23,8 @@ include:
 variables:
   catalog:
     description: "Catálogo - Unity Catalog usado por este ambiente"
+  simulation_mode:
+    default: "true"
 
 targets:
   dev:
@@ -38,7 +41,9 @@ targets:
       catalog: credito_hml
 
   prd:
+    mode: production
     workspace:
       host: https://dbc-13aa7517-c807.cloud.databricks.com
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog: credito_prd

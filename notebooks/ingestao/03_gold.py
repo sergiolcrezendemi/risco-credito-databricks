@@ -14,16 +14,16 @@
 # Orquestração da construção da Gold — lógica real vive em src/features/gold.py
 # ==============================================================================
 
-# MAGIC %md
-# MAGIC ### Parâmetros de execução
-# MAGIC Constrói `gold.dim_customer` e `gold.fct_credit_profile` a partir da UNIÃO de
-# MAGIC `silver.give_me_some_credit` (treino) com `silver.give_me_some_credit_scoring`
-# MAGIC (holdout, se existir). Linhas de scoring ficam com `target_dlq_2yrs` nulo por
-# MAGIC construção — é assim que `notebooks/ml/03_inferencia_batch.py` e os notebooks
-# MAGIC de `notebooks/monitoracao/` identificam o lote novo a pontuar. Rode depois de
-# MAGIC `02_silver.py` (`dataset=training` e, se aplicável, `dataset=scoring`) já
-# MAGIC terem populado a Silver.
-
+"""
+### Parâmetros de execução
+Constrói `gold.dim_customer` e `gold.fct_credit_profile` a partir da UNIÃO de
+`silver.give_me_some_credit` (treino) com `silver.give_me_some_credit_scoring`
+(holdout, se existir). Linhas de scoring ficam com `target_dlq_2yrs` nulo por
+construção — é assim que `notebooks/ml/03_inferencia_batch.py` e os notebooks
+de `notebooks/monitoracao/` identificam o lote novo a pontuar. Rode depois de
+`02_silver.py` (`dataset=training` e, se aplicável, `dataset=scoring`) já
+terem populado a Silver.
+"""
 
 dbutils.widgets.text("catalog", "credito_dev")
 catalog = dbutils.widgets.get("catalog")
@@ -53,17 +53,17 @@ if repo_root not in sys.path:
 
 from src.features.gold import run_gold_ingestion
 
-# MAGIC %md
-# MAGIC ### Execução
+# %md
+### Execução
 
-# MAGIC %%
+# %%
 run_gold_ingestion(spark, catalog=catalog)
 
-# MAGIC %md
+# %md
 # ### Checagem rápida pós-carga
 
-# MAGIC %%
+# %%
 display(spark.table(f"{catalog}.gold.dim_customer").limit(10))
 
-# MAGIC %%
+# %%
 display(spark.table(f"{catalog}.gold.fct_credit_profile").limit(10))

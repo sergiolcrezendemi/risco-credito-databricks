@@ -13,28 +13,34 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# =============================================================================
-# notebooks/ml/03_inferencia_batch.py
-# -----------------------------------------------------------------------------
-# Fase 6 do roteiro-execucao.md — "entrada de novos dados": pega o dataset
-# scoring (holdout, sem target — já ingerido pela Fase 1/01_bronze.py com
-# dataset=scoring e tratado pelas Fases 2/3), aplica o modelo @champion
-# registrado no Unity Catalog Model Registry, e persiste probabilidade +
-# decisão de aprovação por cliente.
-#
-# É o passo que alimenta os dois notebooks de monitoramento que vêm depois
-# (01_drift_dados.py e 02_concept_drift.py) — ambos leem o resultado desta
-# tabela ou os mesmos dados de origem que ela usou.
-#
-# Convenção sobre "quem é o dataset scoring": no Gold (fct_credit_profile),
-# assumimos que os registros de scoring são os que têm TARGET_COL nulo —
-# é assim que a Bronze os ingeriu (o CSV de scoring não tem a coluna
-# SeriousDlqin2yrs). Se no seu Silver/Gold real a separação for por tabela
-# ou por uma coluna explícita (ex.: `dataset_origem`), ajuste o WHERE da
-# seção 2 — o resto do notebook não muda.
-# =============================================================================
+# MAGIC %md
+# MAGIC
+# MAGIC ```
+# MAGIC # =============================================================================
+# MAGIC # notebooks/ml/03_inferencia_batch.py
+# MAGIC # -----------------------------------------------------------------------------
+# MAGIC # Fase 6 do roteiro-execucao.md — "entrada de novos dados": pega o dataset
+# MAGIC # scoring (holdout, sem target — já ingerido pela Fase 1/01_bronze.py com
+# MAGIC # dataset=scoring e tratado pelas Fases 2/3), aplica o modelo @champion
+# MAGIC # registrado no Unity Catalog Model Registry, e persiste probabilidade +
+# MAGIC # decisão de aprovação por cliente.
+# MAGIC #
+# MAGIC # É o passo que alimenta os dois notebooks de monitoramento que vêm depois
+# MAGIC # (01_drift_dados.py e 02_concept_drift.py) — ambos leem o resultado desta
+# MAGIC # tabela ou os mesmos dados de origem que ela usou.
+# MAGIC #
+# MAGIC # Convenção sobre "quem é o dataset scoring": no Gold (fct_credit_profile),
+# MAGIC # assumimos que os registros de scoring são os que têm TARGET_COL nulo —
+# MAGIC # é assim que a Bronze os ingeriu (o CSV de scoring não tem a coluna
+# MAGIC # SeriousDlqin2yrs). Se no seu Silver/Gold real a separação for por tabela
+# MAGIC # ou por uma coluna explícita (ex.: `dataset_origem`), ajuste o WHERE da
+# MAGIC # seção 2 — o resto do notebook não muda.
+# MAGIC # =============================================================================
+# MAGIC
+# MAGIC ```
 
 # COMMAND ----------
+
 
 
 # COMMAND ----------
@@ -194,4 +200,3 @@ print(df_resultado["probabilidade_inadimplencia"].describe())
 spark.createDataFrame(df_resultado).write.mode("append").saveAsTable(OUTPUT_TABLE)
 print(f"\n{len(df_resultado)} previsões gravadas em {OUTPUT_TABLE}.")
 print("Inferência em lote concluída.")
-
