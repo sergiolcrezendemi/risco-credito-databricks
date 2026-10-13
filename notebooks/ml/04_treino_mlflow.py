@@ -60,15 +60,18 @@ from sklearn.preprocessing import StandardScaler
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 mlflow.set_registry_uri("databricks-uc")
 
-# --- Ajuste estes parâmetros ao seu ambiente ---
-CATALOG = "credito_prd"
+# --- Parâmetros (o job passa catalog; nunca fixar o catálogo no código) ---
+dbutils.widgets.text("catalog", "credito_dev")
+dbutils.widgets.text("model_name", "credito_risco_xgb")  # mesmo nome lido por 03_inferencia_batch
+dbutils.widgets.dropdown("gerar_shap", "true", ["true", "false"])  # job (hml/prd) passa "false"
+
+CATALOG = dbutils.widgets.get("catalog")
+GERAR_SHAP = dbutils.widgets.get("gerar_shap") == "true"
 SCHEMA = "gold"
 FCT_TABLE = "fct_credit_profile"
 DIM_CUSTOMER_TABLE = "dim_customer"
 TARGET_COL = "target_dlq_2yrs"  # 1 = inadimplente, 0 = bom pagador
-MODEL_NAME = (
-    f"{CATALOG}.{SCHEMA}.credito_risco_score"  # nome único no Registry (agnóstico ao algoritmo)
-)
+MODEL_NAME = f"{CATALOG}.{SCHEMA}.{dbutils.widgets.get('model_name')}"
 
 # --- Precisão-alvo para a métrica de recall (Q2 do README) ---
 # Ponto de partida documentado — validar com a área de negócio antes de qualquer uso
@@ -260,14 +263,15 @@ with mlflow.start_run(run_name="xgboost") as run_xgb:
     for chave, valor in metricas_xgb.items():
         mlflow.log_metric(chave, valor)
 
-    # SHAP — responde à mesma pergunta de investigação validada no notebook 03 (H1/H2)
-    explainer = shap.TreeExplainer(modelo_xgb)
-    shap_values = explainer.shap_values(X_test)
-    shap.summary_plot(shap_values, X_test, show=False)
-    plt.tight_layout()
-    plt.savefig("/tmp/shap_summary_treino.png", dpi=150)
-    plt.close()
-    mlflow.log_artifact("/tmp/shap_summary_treino.png")
+    # SHAP é análise exploratória (desenvolvimento). Fora do dev o job passa gerar_shap=false.
+    if GERAR_SHAP:
+        explainer = shap.TreeExplainer(modelo_xgb)
+        shap_values = explainer.shap_values(X_test)
+        shap.summary_plot(shap_values, X_test, show=False)
+        plt.tight_layout()
+        plt.savefig("/tmp/shap_summary_treino.png", dpi=150)
+        plt.close()
+        mlflow.log_artifact("/tmp/shap_summary_treino.png")
 
     assinatura_xgb = infer_signature(X_train, modelo_xgb.predict_proba(X_train)[:, 1])
     mlflow.xgboost.log_model(

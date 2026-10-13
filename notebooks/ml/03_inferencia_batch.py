@@ -52,6 +52,7 @@ import logging
 from datetime import datetime, timezone
 
 import mlflow
+import mlflow.sklearn
 import mlflow.xgboost
 import pandas as pd
 from mlflow.tracking import MlflowClient
@@ -122,13 +123,17 @@ from src.ml.decisao import classificar_decisao
 client = MlflowClient()
 try:
     versao_champion = client.get_model_version_by_alias(MODEL_NAME, "champion")
-    modelo = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@champion")
-    print(f"Champion carregado: {MODEL_NAME} versão {versao_champion.version}")
+    # O treino escolhe o vencedor por regra (XGBoost ou Regressão Logística) e grava a
+    # tag "algoritmo". Champions antigos sem a tag são XGBoost.
+    algoritmo = versao_champion.tags.get("algoritmo", "xgboost")
+    flavor = mlflow.sklearn if algoritmo == "logistic_regression" else mlflow.xgboost
+    modelo = flavor.load_model(f"models:/{MODEL_NAME}@champion")
+    print(f"Champion carregado: {MODEL_NAME} versão {versao_champion.version} ({algoritmo})")
 except Exception as e:
     raise RuntimeError(
         f"Não foi possível carregar '{MODEL_NAME}@champion'. Rode antes o notebook "
-        f"de treino (02_vies_threshold_roi.py) para registrar um @champion. Erro original: {e}"
-    )
+        f"de treino (04_treino_mlflow.py) para registrar um @champion. Erro original: {e}"
+    ) from e
 
 # Nota: carregamos com mlflow.xgboost.load_model (não mlflow.pyfunc) de propósito —
 # o flavor pyfunc, dependendo da versão do MLflow, pode devolver classe (0/1) em vez

@@ -19,6 +19,7 @@ resources:
               - xgboost>=2.0
               - shap>=0.44
               - scipy>=1.10
+              - matplotlib>=3.7
               - mlflow>=2.10
               - databricks-sdk>=0.20
               - ../dist/*.whl
@@ -70,28 +71,22 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
 
-        - task_key: hipoteses_h1_h4
+        # HML/PRD não respondem hipóteses nem perguntas de negócio: treinam, registram,
+        # pontuam e monitoram. As análises H1-H4 / viés / ROI ficam como notebooks de DEV.
+        - task_key: treino_modelo
           environment_key: default
           depends_on:
             - task_key: gold
           notebook_task:
-            notebook_path: ../notebooks/ml/01_hipoteses_h1_h4.py
+            notebook_path: ../notebooks/ml/04_treino_mlflow.py
             base_parameters:
               catalog: ${var.catalog}
-
-        - task_key: vies_threshold_roi
-          environment_key: default
-          depends_on:
-            - task_key: gold
-          notebook_task:
-            notebook_path: ../notebooks/ml/02_vies_threshold_roi.py
-            base_parameters:
-              catalog: ${var.catalog}
+              gerar_shap: "false"
 
         - task_key: inferencia_batch
           environment_key: default
           depends_on:
-            - task_key: vies_threshold_roi
+            - task_key: treino_modelo
           notebook_task:
             notebook_path: ../notebooks/ml/03_inferencia_batch.py
             base_parameters:
