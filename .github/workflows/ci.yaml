@@ -72,7 +72,7 @@ jobs:
       - name: Deploy Asset Bundle em HML
         run: databricks bundle deploy -t hml
 
-      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline)
+      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline) 
       - name: Copiar dados brutos dev -> hml
         if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         run: |
