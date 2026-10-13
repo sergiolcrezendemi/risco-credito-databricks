@@ -91,9 +91,9 @@ jobs:
       - name: Gate de qualidade de hml
         if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         env:
-          HML_EXPERIMENT: /Shared/risco_credito_hml   # ajuste
-          METRIC_NAME: auc                            # ajuste
-          MIN_METRIC: "0.80"                          # ajuste
+          MODEL_FULL_NAME: credito_hml.gold.credito_risco_xgb
+          METRIC_NAME: auc_roc
+          MIN_METRIC: "0.80"   # ajuste conforme o mínimo aceitável do negócio
         run: |
           pip install --quiet mlflow-skinny
           python scripts/check_hml_gate.py
