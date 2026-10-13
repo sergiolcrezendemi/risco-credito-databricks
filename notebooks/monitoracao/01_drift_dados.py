@@ -261,4 +261,3 @@ garantir_colunas(OUTPUT_TABLE, {"base_atual": "STRING"})
 )
 
 print(f"\nResultado gravado em {OUTPUT_TABLE} e logado no experimento '{MONITORING_EXPERIMENT}'.")
-

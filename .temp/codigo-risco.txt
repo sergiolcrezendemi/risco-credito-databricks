@@ -31,3 +31,19 @@ git commit -m "style: remove trailing newlines via end-of-file-fixer"
 
 # 5. Envia as correções para a branch remota
 git push origin develop
+
+
+# para achar o erro no github
+winget install --id GitHub.cli
+
+gh auth login --web -h github.com -p https
+         pegar o codigo do terminal e colocar no browser
+
+
+gh run list --branch develop --limit 5
+gh run view <ID-da-execução> --log-failed
+
+    gh run view 38466708947 --log-failed | tail -60
+
+gh run view 38466708947 --log-failed > log.txt
+grep -E "AnalysisException|SparkException|\[[A-Z_]{5,}\]|Caused by|Error:" log.txt | grep -v "    at " | head -20

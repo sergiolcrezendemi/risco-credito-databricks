@@ -9,7 +9,10 @@ sync:
     - "**/.temp_del/**"
     - ".ruff_cache/**"
     - ".git/**"
-
+    - .temp/**
+    - .temp_del/**
+    - docs/**
+    - .vscode/**
 
 artifacts:
   default:
