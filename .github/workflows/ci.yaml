@@ -52,12 +52,13 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     environment: hml
+
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      # Ajuste os caminhos para os volumes reais do projeto
-      DEV_RAW_PATH: dbfs:/Volumes/credito_dev/<schema>/raw_landing
-      HML_RAW_PATH: dbfs:/Volumes/credito_hml/<schema>/raw_landing
+      DEV_RAW_PATH: dbfs:/Volumes/credito_dev/bronze/raw_landing
+      HML_RAW_PATH: dbfs:/Volumes/credito_hml/bronze/raw_landing
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -72,7 +73,7 @@ jobs:
       - name: Deploy Asset Bundle em HML
         run: databricks bundle deploy -t hml
 
-      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline)
+      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline) 
       - name: Copiar dados brutos dev -> hml
         if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         run: |
