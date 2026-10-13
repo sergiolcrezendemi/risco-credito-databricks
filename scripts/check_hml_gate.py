@@ -23,20 +23,27 @@ def main() -> int:
     try:
         mv = client.get_model_version_by_alias(MODEL_FULL_NAME, ALIAS)
     except Exception as e:
-        print(f"[GATE] REPROVADO: {MODEL_FULL_NAME}@{ALIAS} não encontrado. O treino rodou? Erro: {e}")
+        print(
+            f"[GATE] REPROVADO: {MODEL_FULL_NAME}@{ALIAS} não encontrado. O treino rodou? Erro: {e}"
+        )
         return 1
 
     bruto = mv.tags.get(METRIC_NAME)
     if bruto is None:
-        print(f"[GATE] REPROVADO: versão {mv.version} sem a tag '{METRIC_NAME}'. Tags: {dict(mv.tags)}")
+        print(
+            f"[GATE] REPROVADO: versão {mv.version} sem a tag '{METRIC_NAME}'. Tags: {dict(mv.tags)}"
+        )
         return 1
 
     valor = float(bruto)
     algoritmo = mv.tags.get("algoritmo", "?")
-    print(f"[GATE] {MODEL_FULL_NAME} v{mv.version} ({algoritmo}) | {METRIC_NAME}={valor:.4f} | mínimo={MIN_METRIC:.2f}")
+    print(
+        f"[GATE] {MODEL_FULL_NAME} v{mv.version} ({algoritmo}) | {METRIC_NAME}={valor:.4f} | mínimo={MIN_METRIC:.2f}")
 
     if valor < MIN_METRIC:
-        print("[GATE] REPROVADO: métrica abaixo do mínimo.")
+        print(
+            "[GATE] REPROVADO: métrica abaixo do mínimo."
+        )
         return 1
 
     print("[GATE] APROVADO.")
