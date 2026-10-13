@@ -42,8 +42,7 @@ def main() -> int:
     )
 
     if valor < MIN_METRIC:
-        print(
-            "[GATE] REPROVADO: métrica abaixo do mínimo.")
+        print("[GATE] REPROVADO: métrica abaixo do mínimo.")
         return 1
 
     print("[GATE] APROVADO.")
