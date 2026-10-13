@@ -5,7 +5,7 @@ criar ambiente de homologação
 
 1- rodar o script /risco_credito_databricks/script/setup/script-homologação/seed_hml_volume_inicial.ipnb
 2- para validar se o código esta correto para ir para homologação
-       no terminal do databricks 
+       no terminal do databricks
            digitar:   bash scripts/formatar.sh
 
 
@@ -37,6 +37,10 @@ bash
 
 
 ```
+
+A única forma de saber o que o CI vai achar é rodar os mesmos checks antes do push:
+  python -m pre_commit run --all-files
+  python -m pytest tests/ -v
 
 
 ```
