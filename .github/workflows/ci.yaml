@@ -52,6 +52,12 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     environment: hml
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      # Ajuste os caminhos para os volumes reais do projeto
+      DEV_RAW_PATH: dbfs:/Volumes/credito_dev/<schema>/raw_landing
+      HML_RAW_PATH: dbfs:/Volumes/credito_hml/<schema>/raw_landing
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,18 +68,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install build wheel
       - uses: databricks/setup-cli@main
+
       - name: Deploy Asset Bundle em HML
         run: databricks bundle deploy -t hml
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline)
+      - name: Copiar dados brutos dev -> hml
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          databricks fs cp --recursive --overwrite \
+            "$DEV_RAW_PATH" "$HML_RAW_PATH"
+
+      # 2, 3 e 4) Ingestão, modelo, MLflow, drift e concept (tudo em credito_hml)
       - name: Rodar pipeline (se algo em ingestao/ml/monitoracao mudou)
         if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         run: databricks bundle run -t hml risco_credito_pipeline
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
+      # Gate objetivo: só considera hml aprovado se a métrica mínima for atingida
+      - name: Gate de qualidade de hml
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          HML_EXPERIMENT: /Shared/risco_credito_hml   # ajuste
+          METRIC_NAME: auc                            # ajuste
+          MIN_METRIC: "0.80"                          # ajuste
+        run: |
+          pip install --quiet mlflow-skinny
+          python scripts/check_hml_gate.py
+
+  # 5) O fluxo para em hml. Produção só roda no push em main (merge do PR
+  # develop -> main) e fica pausada até aprovação do environment "prd".
   deploy-prd:
     if: >
       github.ref == 'refs/heads/main' && github.event_name == 'push' &&
