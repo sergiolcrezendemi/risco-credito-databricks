@@ -38,12 +38,12 @@ def main() -> int:
     valor = float(bruto)
     algoritmo = mv.tags.get("algoritmo", "?")
     print(
-        f"[GATE] {MODEL_FULL_NAME} v{mv.version} ({algoritmo}) | {METRIC_NAME}={valor:.4f} | mínimo={MIN_METRIC:.2f}")
+        f"[GATE] {MODEL_FULL_NAME} v{mv.version} ({algoritmo}) | {METRIC_NAME}={valor:.4f} | mínimo={MIN_METRIC:.2f}"
+    )
 
     if valor < MIN_METRIC:
         print(
-            "[GATE] REPROVADO: métrica abaixo do mínimo."
-        )
+            "[GATE] REPROVADO: métrica abaixo do mínimo.")
         return 1
 
     print("[GATE] APROVADO.")
