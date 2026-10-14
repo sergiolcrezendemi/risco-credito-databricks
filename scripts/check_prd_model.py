@@ -39,9 +39,7 @@ def main() -> int:
         return 1
 
     origem = (
-        f"origem {tags.get('source_model')} v{tags['source_version']}, "
-        if exigir_linhagem
-        else ""
+        f"origem {tags.get('source_model')} v{tags['source_version']}, " if exigir_linhagem else ""
     )
     print(
         f"OK: {name}@{alias} = v{mv.version} "

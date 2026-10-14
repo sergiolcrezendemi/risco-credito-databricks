@@ -67,6 +67,17 @@ Rollback: em PRD, aponte o alias champion de volta para a versão anterior com s
 ---
         https://claude.ai/chat/fed4f053-7841-4995-a69b-8ada356cbe99
 
+0  - valida o ruff
+pip install -e ".[dev]"     # traz o pre-commit, como no CI
+pre-commit install          # ativa o hook neste clone
+pre-commit run --all-files  # roda uma vez em tudo para conferir
+
+Ou
+
+python -m pip install pre-commit
+python -m pre_commit install
+python -m pre_commit run --all-files
+
 1
 Passo a passo de validação (pré-voo)
 
