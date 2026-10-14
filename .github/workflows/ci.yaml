@@ -27,6 +27,7 @@ jobs:
     outputs:
       relevante: ${{ steps.filter.outputs.relevante }}
       pipeline: ${{ steps.filter.outputs.pipeline }}
+      ci: ${{ steps.filter.outputs.ci }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -47,10 +48,13 @@ jobs:
               - 'src/ingestion/**'
               - 'src/features/**'
               - 'src/models/**'
+            ci:
+              - '.github/workflows/**'
 
   deploy-hml:
     if: >
-      (github.ref == 'refs/heads/develop' && github.event_name == 'push' && needs.detect-changes.outputs.relevante == 'true') ||
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push' &&
+       (needs.detect-changes.outputs.relevante == 'true' || needs.detect-changes.outputs.ci == 'true')) ||
       github.event_name == 'workflow_dispatch'
     needs: detect-changes
     runs-on: ubuntu-latest
