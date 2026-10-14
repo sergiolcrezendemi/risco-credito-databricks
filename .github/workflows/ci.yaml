@@ -37,6 +37,7 @@ jobs:
               - 'notebooks/**'
               - 'src/**'
               - 'resources/**'
+              - 'scripts/**'
               - 'databricks.yml'
               - 'pyproject.toml'
             pipeline:
@@ -72,6 +73,14 @@ jobs:
           pip install build wheel
       - uses: databricks/setup-cli@main
 
+      # Pré-voo (somente leitura): estrutura do catálogo compatível com o pipeline
+      - name: Pré-voo do catálogo HML
+        env:
+          CATALOG: credito_hml
+        run: |
+          pip install --quiet databricks-sdk
+          python scripts/check_preflight.py
+
       - name: Deploy Asset Bundle em HML
         run: databricks bundle deploy -t hml
 
@@ -97,6 +106,16 @@ jobs:
         run: |
           pip install --quiet mlflow-skinny
           python scripts/check_hml_gate.py
+
+      # Smoke test do HML com o mesmo script do PRD (exercita o ambiente do CI cedo)
+      - name: Smoke test HML (champion presente)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          MODEL_FULL_NAME: credito_hml.gold.credito_risco_xgb
+          REQUIRE_LINEAGE: "false"
+        run: |
+          pip install --quiet mlflow-skinny
+          python scripts/check_prd_model.py
 
   # 5) Produção só roda no push em main (merge do PR develop -> main) e fica
   # pausada até aprovação do environment "prd" (Required reviewers).
@@ -129,6 +148,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install build wheel
       - uses: databricks/setup-cli@main
+
+      # Pré-voo (somente leitura): falha antes de tocar em PRD se houver sobras
+      # (view / materialized view / streaming table) onde o pipeline grava Delta
+      - name: Pré-voo do catálogo PRD
+        env:
+          CATALOG: credito_prd
+        run: |
+          pip install --quiet databricks-sdk
+          python scripts/check_preflight.py
 
       # Revalida o modelo de hml antes de promover. Aqui o gate olha o @champion (a versão
       # que a promoção vai copiar e que a inferência de hml realmente usa), e não o @challenger.
