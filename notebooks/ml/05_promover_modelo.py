@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # 05 - Promoção de modelo (HML → PRD)
 # MAGIC
@@ -59,7 +63,7 @@ print(f"Versão aprovada em HML: v{src_mv.version} (run_id={src_mv.run_id})")
 existing = None
 try:
     for mv in client.search_model_versions(f"name='{dst_name}'"):
-        tags = mv.tags or {}
+        tags = dict(client.get_model_version(dst_name, mv.version).tags or {})
         if tags.get("source_model") == src_name and tags.get("source_version") == str(src_mv.version):
             existing = mv
             break
