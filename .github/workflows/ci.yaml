@@ -109,7 +109,6 @@ jobs:
 
       # Smoke test do HML com o mesmo script do PRD (exercita o ambiente do CI cedo)
       - name: Smoke test HML (champion presente)
-        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         env:
           MODEL_FULL_NAME: credito_hml.gold.credito_risco_xgb
           REQUIRE_LINEAGE: "false"
@@ -186,7 +185,6 @@ jobs:
         run: databricks bundle run -t prd risco_credito_pipeline
 
       - name: Smoke test PRD (modelo promovido com linhagem)
-        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
         env:
           MODEL_FULL_NAME: credito_prd.gold.credito_risco_xgb
         run: |
