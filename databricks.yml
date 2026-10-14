@@ -63,7 +63,7 @@ targets:
       modo_modelo: promover          # PRD NÃO treina: promove o champion de hml
       catalogo_origem_modelo: credito_hml
       simulation_mode: "true"        # sem labels reais (dataset estático); troque para "false" só se chegarem desfechos reais
-      alert_email: "sergiolcrezende@veloittech.com.br"  # <-- ajustar
+      alert_email: "sergiolcrezende@veloittech.com.br" 
     resources:
       jobs:
         risco_credito_pipeline:
