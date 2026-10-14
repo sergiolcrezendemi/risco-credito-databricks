@@ -1,0 +1,123 @@
+prompt
+    https://claude.ai/chat/fed4f053-7841-4995-a69b-8ada356cbe99
+
+Siga esta ordem. A base de PRD precisa existir antes do primeiro deploy.
+
+1. Antes de subir o código
+a) Validar o bundle localmente:
+
+bash
+databricks bundle validate -t prd
+Se der erro de YAML ou de variável, corrija agora. É mais barato do que descobrir no CI.
+
+    databricks auth login --host https://dbc-13aa7517-c807.cloud.databricks.com    ->se precisar autenticar
+
+    databricks bundle validate -t prd
+
+b) Trocar SEU_EMAIL_AQUI em alert_email, no target prd do databricks.yml.
+
+c) Criar a base de PRD (uma vez), no SQL Editor ou em um notebook:
+
+sql
+CREATE CATALOG IF NOT EXISTS credito_prd;
+CREATE SCHEMA IF NOT EXISTS credito_prd.bronze;
+CREATE SCHEMA IF NOT EXISTS credito_prd.silver;
+CREATE SCHEMA IF NOT EXISTS credito_prd.gold;
+CREATE VOLUME IF NOT EXISTS credito_prd.bronze.raw_landing;
+Rode SHOW SCHEMAS IN credito_hml e crie em PRD qualquer outro schema que existir lá, como o de monitoração. Se o CREATE CATALOG exigir um managed location, crie o catálogo pela interface.
+
+
+CREATE SCHEMA IF NOT EXISTS credito_prd.ml;     ->caso não exista
+
+
+2. Passar por HML (branch develop)
+Faça commit e push na develop. O CI roda lint-and-test, detect-changes e deploy-hml. Como o DAG mudou, esta execução também testa a nova ramificação (decidir_modelo → treino_modelo) em HML. Confirme que:
+
+o workflow ficou verde, incluindo o gate;
+em credito_hml.gold.credito_risco_xgb existe o alias champion com as tags (algoritmo, auc_roc).
+Se o pre-commit reclamar dos arquivos novos, corrija e suba de novo.
+
+3. Configurar o GitHub
+Em Settings > Environments > prd, ative Required reviewers e confirme que DATABRICKS_HOST e DATABRICKS_TOKEN estão acessíveis a esse environment. Em repositório privado no plano gratuito, a aprovação não está disponível. Nesse caso, o controle é a branch protection da main, exigindo revisão no PR.
+
+4. Levar para produção
+Faça merge do PR develop → main (você já tem um PR aberto).
+O push na main dispara o workflow. O deploy-prd fica aguardando aprovação. Aprove em Review deployments.
+O job executa, em ordem: revalidação do gate, bundle deploy -t prd, cópia dos dados hml → prd, bundle run -t prd e o smoke test.
+Se o merge não disparar o deploy porque o filtro de mudanças deu falso, use Actions > CI e Deploy > Run workflow, escolhendo a branch main.
+
+5. Conferir o resultado
+No Databricks:
+
+Jobs: risco-credito-pipeline-prd, com promover_modelo em sucesso e treino_modelo como excluded. O schedule semanal aparece ativo.
+Catalog: credito_prd.gold.credito_risco_xgb com o alias champion e as tags de linhagem (source_version, auc_roc_hml).
+Tabelas: credito_prd.gold.credito_score_predictions com dados e as saídas de drift.
+Se algo falhar
+Sintoma	Causa provável
+Falha em fs cp	Volume credito_prd.bronze.raw_landing não existe
+Gate reprova	@champion de HML sem a tag auc_roc ou abaixo de 0,80
+Erro de permissão em promover_modelo	Falta CREATE MODEL_VERSION em credito_prd.gold ou EXECUTE no modelo de HML
+inferencia_batch não roda	Verifique o ramo AT_LEAST_ONE_SUCCESS na tela do job
+Não executei nada contra o seu workspace, então o primeiro ciclo é o teste real. Se algum passo falhar, mande a mensagem de erro do log que eu ajusto.
+
+Rollback: em PRD, aponte o alias champion de volta para a versão anterior com set_registered_model_alias e reexecute a inferência.
+
+
+
+---
+        https://claude.ai/chat/fed4f053-7841-4995-a69b-8ada356cbe99
+
+1
+Passo a passo de validação (pré-voo)
+
+1. Alinhar a estrutura de PRD com a de HML (SQL Editor):
+
+sql
+CREATE SCHEMA IF NOT EXISTS credito_prd.ml;
+SHOW SCHEMAS IN credito_hml;
+SHOW SCHEMAS IN credito_prd;
+
+Os dois SHOW devem listar os mesmos schemas, exceto default e information_schema, que são automáticos.
+
+2. Confirmar que HML tem o que será promovido (num notebook):
+
+python
+from mlflow import MlflowClient
+c = MlflowClient(registry_uri="databricks-uc")
+mv = c.get_model_version_by_alias("credito_hml.gold.credito_risco_xgb", "champion")
+print(mv.version, dict(mv.tags))
+
+Confira que a versão tem as tags auc_roc (com valor de 0,80 ou mais), algoritmo e as de recall/KS. Se não houver champion, o gate de PRD reprova e a promoção falha.
+
+3. Confirmar que o último run de HML está completo:
+
+sql
+SELECT count(*) FROM credito_hml.gold.credito_score_predictions;
+SELECT count(*) FROM credito_hml.ml.monitoramento_drift_dados;
+SELECT count(*) FROM credito_hml.ml.monitoramento_concept_drift;
+
+As três contagens devem ser maiores que zero. Em Jobs, o run mais recente de risco-credito-pipeline-hml deve mostrar todas as tasks em sucesso.
+
+4. Confirmar a origem dos dados que serão copiados para PRD:
+
+sql
+LIST '/Volumes/credito_hml/bronze/raw_landing';
+
+Os arquivos de treino e de scoring precisam estar lá, porque o deploy de PRD copia esse volume inteiro.
+
+   via datatabricks
+       DATABRICKS_CONFIG_PROFILE=dbc-13aa7517-c807 MODEL_ALIAS=champion python scripts/check_hml_gate.py
+
+   local se necessário:
+        pip install mlflow-skinny databricks-sdk
+        DATABRICKS_CONFIG_PROFILE=dbc-13aa7517-c807 MODEL_ALIAS=champion python scripts/check_hml_gate.py
+
+
+5. Decidir sobre o modelo antigo de PRD. O credito_prd.gold.credito_risco_xgb já existe de uma execução anterior que treinou direto em PRD. A promoção funciona mesmo assim, mas para uma linhagem limpa você pode apagá-lo antes. Isso é opcional e irreversível, então decida você.
+
+6. Ensaio opcional da promoção. Abra o 05_promover_modelo.py num notebook do workspace e rode com os valores padrão (credito_prd e credito_hml). Se terminar com Alias 'champion' -> credito_prd.gold.credito_risco_xgb v..., a cópia entre catálogos e as permissões estão ok. Isso já altera o alias em PRD, o que o pipeline faria de qualquer forma.
+
+7. Conferir a configuração do GitHub e do bundle:
+
+No databricks.yml, alert_email com o seu e-mail em vez de SEU_EMAIL_AQUI.
+Em Settings > Environments > prd, os secrets DATABRICKS_HOST e DATABRICKS_TOKEN acessíveis e, se o plano permitir, Required reviewers.

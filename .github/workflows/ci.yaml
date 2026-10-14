@@ -1,0 +1,166 @@
+name: CI e Deploy
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths-ignore: [".temp/**", ".temp_del/**", "docs/**", ".vscode/**"]
+  push:
+    branches: [develop, main]
+    paths-ignore: [".temp/**", ".temp_del/**", "docs/**", ".vscode/**"]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: pre-commit run --all-files --show-diff-on-failure
+      - run: python -m pytest tests/ -v
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    outputs:
+      relevante: ${{ steps.filter.outputs.relevante }}
+      pipeline: ${{ steps.filter.outputs.pipeline }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevante:
+              - 'notebooks/**'
+              - 'src/**'
+              - 'resources/**'
+              - 'databricks.yml'
+              - 'pyproject.toml'
+            pipeline:
+              - 'notebooks/ingestao/**'
+              - 'notebooks/ml/**'
+              - 'notebooks/monitoracao/**'
+              - 'src/ingestion/**'
+              - 'src/features/**'
+              - 'src/models/**'
+
+  deploy-hml:
+    if: >
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push' && needs.detect-changes.outputs.relevante == 'true') ||
+      github.event_name == 'workflow_dispatch'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: hml
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DEV_RAW_PATH: dbfs:/Volumes/credito_dev/bronze/raw_landing
+      HML_RAW_PATH: dbfs:/Volumes/credito_hml/bronze/raw_landing
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar ferramentas de build
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+      - uses: databricks/setup-cli@main
+
+      - name: Deploy Asset Bundle em HML
+        run: databricks bundle deploy -t hml
+
+      # 1) Dados brutos dev -> hml (primeira tarefa antes de rodar o pipeline)
+      - name: Copiar dados brutos dev -> hml
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          databricks fs cp --recursive --overwrite \
+            "$DEV_RAW_PATH" "$HML_RAW_PATH"
+
+      # 2, 3 e 4) Ingestão, modelo, MLflow, drift e concept (tudo em credito_hml)
+      - name: Rodar pipeline (se algo em ingestao/ml/monitoracao mudou)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: databricks bundle run -t hml risco_credito_pipeline
+
+      # Gate objetivo: só considera hml aprovado se a métrica mínima for atingida
+      - name: Gate de qualidade de hml
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          MODEL_FULL_NAME: credito_hml.gold.credito_risco_xgb
+          METRIC_NAME: auc_roc
+          MIN_METRIC: "0.80"   # ajuste conforme o mínimo aceitável do negócio
+        run: |
+          pip install --quiet mlflow-skinny
+          python scripts/check_hml_gate.py
+
+  # 5) Produção só roda no push em main (merge do PR develop -> main) e fica
+  # pausada até aprovação do environment "prd" (Required reviewers).
+  # PRD NÃO treina: promove o modelo `champion` aprovado em hml (task promover_modelo).
+  deploy-prd:
+    if: >
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'push' && needs.detect-changes.outputs.relevante == 'true') ||
+       github.event_name == 'workflow_dispatch')
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment: prd
+    concurrency:
+      group: deploy-prd
+      cancel-in-progress: false
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      HML_RAW_PATH: dbfs:/Volumes/credito_hml/bronze/raw_landing
+      PRD_RAW_PATH: dbfs:/Volumes/credito_prd/bronze/raw_landing
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar ferramentas de build
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+      - uses: databricks/setup-cli@main
+
+      # Revalida o modelo de hml antes de promover. Aqui o gate olha o @champion (a versão
+      # que a promoção vai copiar e que a inferência de hml realmente usa), e não o @challenger.
+      - name: Revalidar gate de HML antes de promover
+        env:
+          MODEL_FULL_NAME: credito_hml.gold.credito_risco_xgb
+          MODEL_ALIAS: champion
+          METRIC_NAME: auc_roc
+          MIN_METRIC: "0.80"   # manter igual ao deploy-hml
+        run: |
+          pip install --quiet mlflow-skinny
+          python scripts/check_hml_gate.py
+
+      - name: Deploy Asset Bundle em PRD
+        run: databricks bundle deploy -t prd
+
+      # Pré-requisito (uma vez, fora do CI): catálogo/schemas/volume de credito_prd criados
+      # pelo script de setup, igual ao seed de hml.
+      - name: Copiar dados brutos hml -> prd
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          databricks fs cp --recursive --overwrite \
+            "$HML_RAW_PATH" "$PRD_RAW_PATH"
+
+      - name: Rodar pipeline em PRD (promove modelo, pontua e monitora)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        run: databricks bundle run -t prd risco_credito_pipeline
+
+      - name: Smoke test PRD (modelo promovido com linhagem)
+        if: needs.detect-changes.outputs.pipeline == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          MODEL_FULL_NAME: credito_prd.gold.credito_risco_xgb
+        run: |
+          pip install --quiet mlflow-skinny
+          python scripts/check_prd_model.py

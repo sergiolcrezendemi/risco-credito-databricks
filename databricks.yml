@@ -1,12 +1,43 @@
 bundle:
   name: risco-credito-databricks
 
+sync:
+  exclude:
+    - "**/.venv/**"
+    - "**/__pycache__/**"
+    - "**/.temp/**"
+    - "**/.temp_del/**"
+    - ".ruff_cache/**"
+    - ".git/**"
+    - .temp/**
+    - .temp_del/**
+    - docs/**
+    - .vscode/**
+
+artifacts:
+  default:
+    type: whl
+    build: python -m build
+    path: .
+
 include:
   - resources/*.yml
 
 variables:
   catalog:
-    description: "Catálogo Unity Catalog usado por este ambiente"
+    description: "Catálogo - Unity Catalog usado por este ambiente"
+  simulation_mode:
+    description: "true = concept drift simulado (sem labels reais)"
+    default: "true"
+  modo_modelo:
+    description: "treinar (dev/hml) ou promover (prd: copia o modelo aprovado em hml)"
+    default: "treinar"
+  catalogo_origem_modelo:
+    description: "Catálogo de onde o modelo é promovido (usado só quando modo_modelo=promover)"
+    default: credito_hml
+  alert_email:
+    description: "E-mail que recebe alerta de falha do job em PRD"
+    default: ""
 
 targets:
   dev:
@@ -23,7 +54,24 @@ targets:
       catalog: credito_hml
 
   prd:
+    mode: production
     workspace:
       host: https://dbc-13aa7517-c807.cloud.databricks.com
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog: credito_prd
+      modo_modelo: promover          # PRD NÃO treina: promove o champion de hml
+      catalogo_origem_modelo: credito_hml
+      simulation_mode: "true"        # sem labels reais (dataset estático); troque para "false" só se chegarem desfechos reais
+      alert_email: "sergiolcrezende@veloittech.com.br" 
+    resources:
+      jobs:
+        risco_credito_pipeline:
+          # Execução recorrente só em PRD (dev/hml seguem manuais / via CI)
+          schedule:
+            quartz_cron_expression: "0 0 6 ? * MON"   # segundas, 06:00 (ajuste; atenção à cota da Free Edition)
+            timezone_id: America/Sao_Paulo
+            pause_status: UNPAUSED
+          email_notifications:
+            on_failure:
+              - ${var.alert_email}

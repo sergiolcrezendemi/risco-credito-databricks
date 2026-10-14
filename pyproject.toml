@@ -16,13 +16,39 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "ruff>=0.5", "pre-commit>=3.7"]
 
+[tool.databricks.environment]
+environment_version = "5"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+builtins = ["dbutils"]
+force-exclude = true
+extend-include = ["*.ipynb"]
+extend-exclude = [
+    "**/.temp/**",
+    ".temp/**",
+    "docs/**",
+    ".temp_del/**"
+]
+
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/**/*.py" = ["F821", "E402", "I001"]
+"scripts/**/*.py" = ["F821", "E402", "I001"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
