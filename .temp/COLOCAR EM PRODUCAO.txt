@@ -61,3 +61,63 @@ inferencia_batch não roda	Verifique o ramo AT_LEAST_ONE_SUCCESS na tela do job
 Não executei nada contra o seu workspace, então o primeiro ciclo é o teste real. Se algum passo falhar, mande a mensagem de erro do log que eu ajusto.
 
 Rollback: em PRD, aponte o alias champion de volta para a versão anterior com set_registered_model_alias e reexecute a inferência.
+
+
+
+---
+        https://claude.ai/chat/fed4f053-7841-4995-a69b-8ada356cbe99
+
+1
+Passo a passo de validação (pré-voo)
+
+1. Alinhar a estrutura de PRD com a de HML (SQL Editor):
+
+sql
+CREATE SCHEMA IF NOT EXISTS credito_prd.ml;
+SHOW SCHEMAS IN credito_hml;
+SHOW SCHEMAS IN credito_prd;
+
+Os dois SHOW devem listar os mesmos schemas, exceto default e information_schema, que são automáticos.
+
+2. Confirmar que HML tem o que será promovido (num notebook):
+
+python
+from mlflow import MlflowClient
+c = MlflowClient(registry_uri="databricks-uc")
+mv = c.get_model_version_by_alias("credito_hml.gold.credito_risco_xgb", "champion")
+print(mv.version, dict(mv.tags))
+
+Confira que a versão tem as tags auc_roc (com valor de 0,80 ou mais), algoritmo e as de recall/KS. Se não houver champion, o gate de PRD reprova e a promoção falha.
+
+3. Confirmar que o último run de HML está completo:
+
+sql
+SELECT count(*) FROM credito_hml.gold.credito_score_predictions;
+SELECT count(*) FROM credito_hml.ml.monitoramento_drift_dados;
+SELECT count(*) FROM credito_hml.ml.monitoramento_concept_drift;
+
+As três contagens devem ser maiores que zero. Em Jobs, o run mais recente de risco-credito-pipeline-hml deve mostrar todas as tasks em sucesso.
+
+4. Confirmar a origem dos dados que serão copiados para PRD:
+
+sql
+LIST '/Volumes/credito_hml/bronze/raw_landing';
+
+Os arquivos de treino e de scoring precisam estar lá, porque o deploy de PRD copia esse volume inteiro.
+
+   via datatabricks
+       DATABRICKS_CONFIG_PROFILE=dbc-13aa7517-c807 MODEL_ALIAS=champion python scripts/check_hml_gate.py
+
+   local se necessário:
+        pip install mlflow-skinny databricks-sdk
+        DATABRICKS_CONFIG_PROFILE=dbc-13aa7517-c807 MODEL_ALIAS=champion python scripts/check_hml_gate.py
+
+
+5. Decidir sobre o modelo antigo de PRD. O credito_prd.gold.credito_risco_xgb já existe de uma execução anterior que treinou direto em PRD. A promoção funciona mesmo assim, mas para uma linhagem limpa você pode apagá-lo antes. Isso é opcional e irreversível, então decida você.
+
+6. Ensaio opcional da promoção. Abra o 05_promover_modelo.py num notebook do workspace e rode com os valores padrão (credito_prd e credito_hml). Se terminar com Alias 'champion' -> credito_prd.gold.credito_risco_xgb v..., a cópia entre catálogos e as permissões estão ok. Isso já altera o alias em PRD, o que o pipeline faria de qualquer forma.
+
+7. Conferir a configuração do GitHub e do bundle:
+
+No databricks.yml, alert_email com o seu e-mail em vez de SEU_EMAIL_AQUI.
+Em Settings > Environments > prd, os secrets DATABRICKS_HOST e DATABRICKS_TOKEN acessíveis e, se o plano permitir, Required reviewers.
