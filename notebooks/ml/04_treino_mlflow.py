@@ -66,6 +66,9 @@ dbutils.widgets.text("model_name", "credito_risco_xgb")  # mesmo nome lido por 0
 dbutils.widgets.dropdown("gerar_shap", "true", ["true", "false"])  # job (hml/prd) passa "false"
 
 CATALOG = dbutils.widgets.get("catalog")
+if CATALOG.endswith("_prd"):
+    raise RuntimeError("Treino não roda em PRD: o modelo é promovido de HML (05_promover_modelo).")
+
 GERAR_SHAP = dbutils.widgets.get("gerar_shap") == "true"
 SCHEMA = "gold"
 FCT_TABLE = "fct_credit_profile"
@@ -361,4 +364,3 @@ except mlflow.exceptions.RestException:
     )
 
 print("\nTreino concluído e registrado no MLflow / Unity Catalog Model Registry.")
-

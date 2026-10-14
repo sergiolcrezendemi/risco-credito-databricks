@@ -1,6 +1,10 @@
 # resources/risco_credito_pipeline.yml
 # ==============================================================================
 # Job que orquestra o pipeline ponta a ponta.
+#
+# Mesmo DAG em todos os ambientes; o que muda é a variável `modo_modelo`:
+#   - treinar  (dev/hml): treina e registra o modelo no catálogo do ambiente
+#   - promover (prd)    : NÃO treina; copia o modelo `champion` aprovado em hml
 # ==============================================================================
 
 resources:
@@ -71,22 +75,52 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
 
+        # ----------------------------------------------------------------------
+        # Ramificação: treinar (dev/hml) OU promover (prd)
+        # ----------------------------------------------------------------------
+        - task_key: decidir_modelo
+          condition_task:
+            op: EQUAL_TO
+            left: ${var.modo_modelo}
+            right: treinar
+
         # HML/PRD não respondem hipóteses nem perguntas de negócio: treinam, registram,
         # pontuam e monitoram. As análises H1-H4 / viés / ROI ficam como notebooks de DEV.
         - task_key: treino_modelo
           environment_key: default
           depends_on:
             - task_key: gold
+            - task_key: decidir_modelo
+              outcome: "true"
           notebook_task:
             notebook_path: ../notebooks/ml/04_treino_mlflow.py
             base_parameters:
               catalog: ${var.catalog}
               gerar_shap: "false"
 
-        - task_key: inferencia_batch
+        - task_key: promover_modelo
           environment_key: default
           depends_on:
+            - task_key: gold
+            - task_key: decidir_modelo
+              outcome: "false"
+          notebook_task:
+            notebook_path: ../notebooks/ml/05_promover_modelo.py
+            base_parameters:
+              catalog: ${var.catalog}
+              source_catalog: ${var.catalogo_origem_modelo}
+              schema: gold
+              model_name: credito_risco_xgb
+              source_alias: champion   # versão servida/validada em HML
+              alias: champion          # alias que a inferência de PRD carrega
+
+        - task_key: inferencia_batch
+          environment_key: default
+          # Roda se treinou OU promoveu (o ramo não escolhido fica "excluded")
+          run_if: AT_LEAST_ONE_SUCCESS
+          depends_on:
             - task_key: treino_modelo
+            - task_key: promover_modelo
           notebook_task:
             notebook_path: ../notebooks/ml/03_inferencia_batch.py
             base_parameters:
@@ -109,4 +143,4 @@ resources:
             notebook_path: ../notebooks/monitoracao/02_concept_drift.py
             base_parameters:
               catalog: ${var.catalog}
-              simulation_mode: "true"
+              simulation_mode: "${var.simulation_mode}"
