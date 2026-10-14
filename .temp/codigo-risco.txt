@@ -47,3 +47,6 @@ gh run view <ID-da-execução> --log-failed
 
 gh run view 38466708947 --log-failed > log.txt
 grep -E "AnalysisException|SparkException|\[[A-Z_]{5,}\]|Caused by|Error:" log.txt | grep -v "    at " | head -20
+=======
+
+
